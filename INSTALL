@@ -1,0 +1,8 @@
+DirectFB-media-samples is built using Meson and Ninja:
+
+  $ meson build/
+  $ ninja -C build/
+
+Finally, you can install DirectFB-media-samples using:
+
+  $ ninja -C build/ install
