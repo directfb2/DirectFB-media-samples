@@ -314,7 +314,7 @@ static void set_volume( float step )
 
 static void print_usage()
 {
-     printf( "DirectFB Video Viewer\n\n" );
+     printf( "DirectFB Video Viewer Sample\n\n" );
      printf( "Usage: df_video_sample [options] video\n\n" );
      printf( "Options:\n\n" );
      printf( "  --info                   Dump stream info.\n" );

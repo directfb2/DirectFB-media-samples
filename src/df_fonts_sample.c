@@ -309,8 +309,9 @@ static void dfb_shutdown()
 
 static void print_usage()
 {
-     printf( "DirectFB Font Viewer\n\n" );
-     printf( "Usage: df_fonts <fontfile> ... <fontfile>\n\n" );
+     printf( "DirectFB Font Viewer Sample\n\n" );
+     printf( "Usage: df_fonts_sample [options] <fontfile> ... <fontfile>\n\n" );
+     printf( "Options:\n\n" );
      printf( "  --help      Print usage information.\n" );
      printf( "  --dfb-help  Output DirectFB usage information.\n\n" );
      printf( "Use:\n" );
