@@ -199,8 +199,9 @@ static bool frame_blitter( DirectHash *stack, unsigned long id, void *value, voi
 
 static void print_usage()
 {
-     printf( "DirectFB Image Viewer\n\n" );
-     printf( "Usage: df_image_sample [options] image\n" );
+     printf( "DirectFB Image Viewer Sample\n\n" );
+     printf( "Usage: df_image_sample [options] image\n\n" );
+     printf( "Options:\n\n" );
      printf( "  --info                   Dump image info.\n" );
      printf( "  --no-logo                Do not display DirectFB logo in the upper-left corner of the window.\n" );
      printf( "  --format=<pixelformat>   Select the pixelformat to use.\n" );

@@ -18,7 +18,8 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 #  THE SOFTWARE.
 
-project('DirectFB-media-samples', 'c')
+project('DirectFB-media-samples', 'c',
+        version: '2.0.0')
 
 directfb_dep = dependency('directfb')
 
