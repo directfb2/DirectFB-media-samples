@@ -24,12 +24,12 @@
 #include <directfb.h>
 
 /* macro for a safe call to DirectFB functions */
-#define DFBCHECK(x...)                                                \
+#define DFBCHECK(x)                                                   \
      do {                                                             \
-          DFBResult err = x;                                          \
-          if (err != DFB_OK) {                                        \
+          DFBResult ret = x;                                          \
+          if (ret != DFB_OK) {                                        \
                fprintf( stderr, "%s <%d>:\n\t", __FILE__, __LINE__ ); \
-               DirectFBErrorFatal( #x, err );                         \
+               DirectFBErrorFatal( #x, ret );                         \
           }                                                           \
      } while (0)
 
@@ -309,26 +309,26 @@ static void dfb_shutdown()
 
 static void print_usage()
 {
-     printf( "DirectFB Font Viewer Sample\n\n" );
+     printf( "DirectFB Font Sample Viewer\n\n" );
      printf( "Usage: df_fonts_sample [options] <fontfile> ... <fontfile>\n\n" );
      printf( "Options:\n\n" );
      printf( "  --help      Print usage information.\n" );
      printf( "  --dfb-help  Output DirectFB usage information.\n\n" );
      printf( "Use:\n" );
-     printf( "  ESC,Q,q to quit\n" );
-     printf( "  F1,H,h to show help\n" );
-     printf( "  Space,up to show next font\n" );
-     printf( "  Backspace,down to show prev font\n" );
+     printf( "  ESC,Q,q           to quit\n" );
+     printf( "  F1,H,h            to show help\n" );
+     printf( "  Space,up          to show next font\n" );
+     printf( "  Backspace,down    to show prev font\n" );
      printf( "  page up,page down to show next/prev page\n" );
-     printf( "  A,a to show/hide ascender\n" );
-     printf( "  B,b to show/hide baseline\n" );
-     printf( "  D,d to show/hide descender\n" );
-     printf( "  G,g to show/hide glyph advance\n" );
-     printf( "  M,m to enable/disable antialiasing\n" );
-     printf( "  O,o to show/hide glyph origin\n" );
-     printf( "  R,r to show/hide glyph rectangle\n" );
-     printf( "  U,u to toggle Unicode/Raw glyph map\n" );
-     printf( "  plus,minus  to increase/decrease the number of glyphs per page\n" );
+     printf( "  +,-               to increase/decrease the number of glyphs per page\n" );
+     printf( "  A,a               to show/hide ascender\n" );
+     printf( "  B,b               to show/hide baseline\n" );
+     printf( "  D,d               to show/hide descender\n" );
+     printf( "  G,g               to show/hide glyph advance\n" );
+     printf( "  M,m               to enable/disable antialiasing\n" );
+     printf( "  O,o               to show/hide glyph origin\n" );
+     printf( "  R,r               to show/hide glyph rectangle\n" );
+     printf( "  U,u               to toggle Unicode/Raw glyph map\n" );
 }
 
 int main( int argc, char *argv[] )

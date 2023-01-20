@@ -23,4 +23,6 @@ project('DirectFB-media-samples', 'c',
 
 directfb_dep = dependency('directfb')
 
+fusionsound_dep = dependency('fusionsound', required: false)
+
 subdir('src')
