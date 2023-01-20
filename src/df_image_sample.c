@@ -28,12 +28,12 @@
 #include "dfblogo.h"
 
 /* macro for a safe call to DirectFB functions */
-#define DFBCHECK(x...)                                                \
+#define DFBCHECK(x)                                                   \
      do {                                                             \
-          DFBResult err = x;                                          \
-          if (err != DFB_OK) {                                        \
+          DFBResult ret = x;                                          \
+          if (ret != DFB_OK) {                                        \
                fprintf( stderr, "%s <%d>:\n\t", __FILE__, __LINE__ ); \
-               DirectFBErrorFatal( #x, err );                         \
+               DirectFBErrorFatal( #x, ret );                         \
           }                                                           \
      } while (0)
 
@@ -197,9 +197,11 @@ static bool frame_blitter( DirectHash *stack, unsigned long id, void *value, voi
      return true;
 }
 
+/******************************************************************************/
+
 static void print_usage()
 {
-     printf( "DirectFB Image Viewer Sample\n\n" );
+     printf( "DirectFB Image Sample Viewer\n\n" );
      printf( "Usage: df_image_sample [options] image\n\n" );
      printf( "Options:\n\n" );
      printf( "  --info                   Dump image info.\n" );
@@ -228,7 +230,7 @@ int main( int argc, char *argv[] )
 {
      DFBSurfaceDescription  dsc;
      int                    i;
-     char                  *mrl = NULL;
+     const char            *mrl = NULL;
 
      if (argc < 2) {
           print_usage();
@@ -276,7 +278,7 @@ int main( int argc, char *argv[] )
 
      if (!mrl || !*mrl) {
           print_usage();
-          return 0;
+          return 1;
      }
 
      /* create the main interface */
@@ -317,6 +319,8 @@ int main( int argc, char *argv[] )
      /* main loop */
      while (1) {
           DFBWindowEvent evt;
+
+          event_buffer->WaitForEvent( event_buffer );
 
           /* process event buffer */
           while (event_buffer->GetEvent( event_buffer, DFB_EVENT(&evt) ) == DFB_OK) {

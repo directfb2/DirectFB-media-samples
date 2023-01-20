@@ -20,6 +20,10 @@
 
 data_inc = include_directories('../data')
 
-executable('df_fonts_sample', 'df_fonts_sample.c',                                dependencies: directfb_dep, install: true)
-executable('df_image_sample', 'df_image_sample.c', include_directories: data_inc, dependencies: directfb_dep, install: true)
-executable('df_video_sample', 'df_video_sample.c', include_directories: data_inc, dependencies: directfb_dep, install: true)
+executable('df_fonts_sample', 'df_fonts_sample.c',                                dependencies: directfb_dep,    install: true)
+executable('df_image_sample', 'df_image_sample.c', include_directories: data_inc, dependencies: directfb_dep,    install: true)
+executable('df_video_sample', 'df_video_sample.c', include_directories: data_inc, dependencies: directfb_dep,    install: true)
+
+if fusionsound_dep.found()
+executable('fs_music_sample', 'fs_music_sample.c',                                dependencies: fusionsound_dep, install: true)
+endif

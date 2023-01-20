@@ -29,12 +29,12 @@
 #include "dfblogo.h"
 
 /* macro for a safe call to DirectFB functions */
-#define DFBCHECK(x...)                                                \
+#define DFBCHECK(x)                                                   \
      do {                                                             \
-          DFBResult err = x;                                          \
-          if (err != DFB_OK) {                                        \
+          DFBResult ret = x;                                          \
+          if (ret != DFB_OK) {                                        \
                fprintf( stderr, "%s <%d>:\n\t", __FILE__, __LINE__ ); \
-               DirectFBErrorFatal( #x, err );                         \
+               DirectFBErrorFatal( #x, ret );                         \
           }                                                           \
      } while (0)
 
@@ -314,7 +314,7 @@ static void set_volume( float step )
 
 static void print_usage()
 {
-     printf( "DirectFB Video Viewer Sample\n\n" );
+     printf( "DirectFB Video Sample Viewer\n\n" );
      printf( "Usage: df_video_sample [options] video\n\n" );
      printf( "Options:\n\n" );
      printf( "  --info                   Dump stream info.\n" );
@@ -330,6 +330,7 @@ static void print_usage()
      printf( "  Space,P,p   to pause/resume playback\n" );
      printf( "  left,right  to seek\n" );
      printf( "  up,down     to increase/decrease playback speed\n" );
+     printf( "  +,-         to increase/decrease volume level\n" );
      printf( "  B,b + right to increase brightness\n" );
      printf( "  B,b + left  to decrease brightness\n" );
      printf( "  C,c + right to increase contrast\n" );
@@ -338,7 +339,6 @@ static void print_usage()
      printf( "  S,s + left  to decrease saturation\n" );
      printf( "  H,h + right to increase hue\n" );
      printf( "  H,h + left  to decrease hue\n" );
-     printf( "  plus,minus  to increase/decrease volume level\n" );
 }
 
 static void dfb_shutdown()
@@ -357,7 +357,7 @@ int main( int argc, char *argv[] )
      DFBVideoProviderCapabilities  caps;
      DFBSurfaceDescription         dsc;
      int                           i;
-     char                         *mrl = NULL;
+     const char                   *mrl = NULL;
 
      if (argc < 2) {
           print_usage();
@@ -405,7 +405,7 @@ int main( int argc, char *argv[] )
 
      if (!mrl || !*mrl) {
           print_usage();
-          return 0;
+          return 1;
      }
 
      /* create the main interface */
