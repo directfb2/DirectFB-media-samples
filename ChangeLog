@@ -1,3 +1,39 @@
+commit cf1afef62ca2f382e0767f81220d904e59aeefe1
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Fri Jan 20 10:05:16 2023 +0100
+
+    Add music sample player
+
+commit 9705ec243705b83f2f49574da04d531d8dfaeb7e
+Merge: e40fdf8 de3ceac
+Author: DirectFB2 <80045286+directfb2@users.noreply.github.com>
+Date:   Thu Nov 24 17:44:00 2022 +0100
+
+    Merge pull request #2 from caramelli/master
+    
+    Add sample font decker.ttf
+
+commit de3ceaceab44e8843feb725f592abf8179270606
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Thu Nov 24 17:35:29 2022 +0100
+
+    Add sample font decker.ttf
+
+commit e40fdf8d33395d699cdf06ef303b6bbedefcd987
+Merge: a0e0778 75f8085
+Author: DirectFB2 <80045286+directfb2@users.noreply.github.com>
+Date:   Tue Jan 18 18:29:15 2022 +0100
+
+    Merge pull request #1 from caramelli/master
+    
+    Add sample viewers
+
+commit 75f8085a1728a2007ae9f91d346c5791ab2ecfe8
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Tue Jan 18 18:26:59 2022 +0100
+
+    Add ChangeLog
+
 commit 58767cc64425140d27ccb0b40bfd41c2b99d628c
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Tue Jan 18 18:11:23 2022 +0100
