@@ -1,3 +1,24 @@
+commit ee89b1028b9767acfb951b2678c4dfb7039bc5d0
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Thu Jan 26 18:10:09 2023 +0100
+
+    Add MNG sample
+
+commit 369c22b8b1133a940f52c6ed91567a059f5ffda5
+Merge: 9705ec2 746daea
+Author: DirectFB2 <80045286+directfb2@users.noreply.github.com>
+Date:   Fri Jan 20 10:06:27 2023 +0100
+
+    Merge pull request #3 from caramelli/master
+    
+    Add music sample player
+
+commit 746daeaf4d21d3741b133126c823d3732edf7e85
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Fri Jan 20 10:05:25 2023 +0100
+
+    Update ChangeLog
+
 commit cf1afef62ca2f382e0767f81220d904e59aeefe1
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Fri Jan 20 10:05:16 2023 +0100
