@@ -169,7 +169,7 @@ int main( int argc, char *argv[] )
                if (!strcmp( option, "-quiet" )) {
                     quiet = 1;
                } else
-               if (!strcmp( option, "-depth=" )) {
+               if (!strncmp( option, "-depth=", sizeof("-depth=") - 1 )) {
                     option += sizeof("-depth=") - 1;
                     switch (atoi( option )) {
                          case 8:
