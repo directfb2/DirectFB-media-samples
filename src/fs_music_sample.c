@@ -250,7 +250,7 @@ int main( int argc, char *argv[] )
                if (!quiet)
                     fprintf( stderr, "\nMedia %d (%s):\n", media->id, media->mrl );
 
-               for (track = (MediaTrack*) media->tracks; track;) {
+               for (track = (MediaTrack*) media->tracks; track && !quit;) {
                     double len       = 0;
                     int    vol_set   = 0;
                     int    pitch_set = 0;
