@@ -408,6 +408,8 @@ int main( int argc, char *argv[] )
           return 1;
      }
 
+     i = 0;
+
      /* create the main interface */
      DFBCHECK(DirectFBCreate( &dfb ));
 
@@ -473,6 +475,16 @@ int main( int argc, char *argv[] )
           while (event_buffer->GetEvent( event_buffer, DFB_EVENT(&evt) ) == DFB_OK) {
                switch (evt.type) {
                     case DWET_KEYDOWN:
+                         if ((caps & DVCAPS_INTERACTIVE) &&
+                             (evt.modifiers & DIMM_META) &&
+                             DFB_LOWER_CASE( evt.key_symbol ) == DIKS_SMALL_I)
+                              i = !i;
+
+                         if (i) {
+                              video->SendEvent( video, DFB_EVENT(&evt) );
+                              break;
+                         }
+
                          switch (DFB_LOWER_CASE( evt.key_symbol )) {
                               case DIKS_ESCAPE:
                               case DIKS_SMALL_Q:
@@ -557,6 +569,11 @@ int main( int argc, char *argv[] )
                          break;
 
                     case DWET_KEYUP:
+                         if (i) {
+                              video->SendEvent( video, DFB_EVENT(&evt) );
+                              break;
+                         }
+
                          switch (DFB_LOWER_CASE( evt.key_symbol )) {
                               case DIKS_SMALL_B:
                                    if (caps & DVCAPS_BRIGHTNESS)
@@ -584,12 +601,13 @@ int main( int argc, char *argv[] )
                     case DWET_ENTER:
                     case DWET_MOTION:
                     case DWET_LEAVE:
-                         if (caps & DVCAPS_INTERACTIVE) {
+                         if (i) {
                               /* scale window coordinates to video coordinates */
                               evt.x = evt.x * dsc.width  / width;
                               evt.y = evt.y * dsc.height / height;
 
                               video->SendEvent( video, DFB_EVENT(&evt) );
+                              break;
                          }
                          break;
 
