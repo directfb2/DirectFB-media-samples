@@ -1,3 +1,39 @@
+commit d19be98301e778a2beb8157f40b1046d5b23438f
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Tue Mar 14 03:28:34 2023 +0100
+
+    df_video_sample: Press <Meta>-'I' to enable/disable redirecting events to interactive video providers
+
+commit ae07ce86583851fe738a5a44ae99891368d77c75
+Merge: 1847010 0280fc0
+Author: DirectFB2 <80045286+directfb2@users.noreply.github.com>
+Date:   Sat Mar 11 07:58:54 2023 +0100
+
+    Merge pull request #5 from caramelli/master
+    
+    Add SWF sample
+
+commit 0280fc086f4744efe4d4b9eeb217aa7cff499f91
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Sat Mar 11 07:59:23 2023 +0100
+
+    Add SWF sample
+
+commit 18470103dbea9d7dfccd873998a68d1b8b96b8b8
+Merge: 369c22b 02a27a8
+Author: DirectFB2 <80045286+directfb2@users.noreply.github.com>
+Date:   Thu Jan 26 18:13:09 2023 +0100
+
+    Merge pull request #4 from caramelli/master
+    
+    Add MNG sample
+
+commit 02a27a8ede7ecd0f462a74d1d779245e83fc5fde
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Thu Jan 26 18:10:24 2023 +0100
+
+    Update ChangeLog
+
 commit ee89b1028b9767acfb951b2678c4dfb7039bc5d0
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Thu Jan 26 18:10:09 2023 +0100
