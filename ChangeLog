@@ -1,3 +1,24 @@
+commit 4f9686bcee14e56be82fd2060b7304cc278dea88
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Sat Mar 18 08:35:06 2023 +0100
+
+    df_video_sample: Rework adjust_color()
+
+commit eb868ccad072acf896c11a3db68f871d822f702f
+Merge: ae07ce8 257e78f
+Author: DirectFB2 <80045286+directfb2@users.noreply.github.com>
+Date:   Tue Mar 14 03:37:14 2023 +0100
+
+    Merge pull request #6 from caramelli/master
+    
+    df_video_sample: Press <Meta>-'I' to enable/disable redirecting events to interactive video providers
+
+commit 257e78fcd58622ef2eabd4d3d8decbd0651488f4
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Tue Mar 14 03:29:37 2023 +0100
+
+    Update ChangeLog
+
 commit d19be98301e778a2beb8157f40b1046d5b23438f
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Tue Mar 14 03:28:34 2023 +0100
