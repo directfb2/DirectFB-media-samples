@@ -275,30 +275,24 @@ static void adjust_color( DFBColorAdjustmentFlags flags, int step )
 {
      DFBColorAdjustment adj;
 
-     adj.flags = 0;
+     if (video->GetColorAdjustment( video, &adj ) != DFB_OK)
+          return;
 
-     if (flags & DCAF_BRIGHTNESS) {
-          adj.flags      |= DCAF_BRIGHTNESS;
-          adj.brightness  = CLAMP( adj.brightness + step, 0, 0xffff );
-     }
+     adj.flags = flags;
 
-     if (flags & DCAF_CONTRAST) {
-          adj.flags    |= DCAF_CONTRAST;
-          adj.contrast  = CLAMP( adj.contrast + step, 0, 0xffff );
-     }
+     if (flags & DCAF_BRIGHTNESS)
+          adj.brightness = CLAMP( adj.brightness + step, 0, 0xffff );
 
-     if (flags & DCAF_HUE) {
-          adj.flags |= DCAF_HUE;
-          adj.hue    = CLAMP( adj.hue + step, 0, 0xffff );
-     }
+     if (flags & DCAF_CONTRAST)
+          adj.contrast = CLAMP( adj.contrast + step, 0, 0xffff );
 
-     if (flags & DCAF_SATURATION) {
-          adj.flags      |= DCAF_SATURATION;
-          adj.saturation  = CLAMP( adj.saturation + step, 0, 0xffff );
-     }
+     if (flags & DCAF_HUE)
+          adj.hue = CLAMP( adj.hue + step, 0, 0xffff );
 
-     if (adj.flags)
-          video->SetColorAdjustment( video, &adj );
+     if (flags & DCAF_SATURATION)
+          adj.saturation = CLAMP( adj.saturation + step, 0, 0xffff );
+
+     video->SetColorAdjustment( video, &adj );
 }
 
 static void set_volume( float step )
@@ -357,7 +351,8 @@ int main( int argc, char *argv[] )
      DFBVideoProviderCapabilities  caps;
      DFBSurfaceDescription         dsc;
      int                           i;
-     const char                   *mrl = NULL;
+     DFBColorAdjustmentFlags       flags = DCAF_NONE;
+     const char                   *mrl   = NULL;
 
      if (argc < 2) {
           print_usage();
@@ -452,7 +447,6 @@ int main( int argc, char *argv[] )
      while (1) {
           DFBWindowEvent         evt;
           DFBVideoProviderStatus status = DVSTATE_UNKNOWN;
-          static int             adj    = 0;
 
           if (logo) {
                if (event_buffer->WaitForEventWithTimeout( event_buffer, 0, 150 ) == DFB_TIMEOUT) {
@@ -514,31 +508,31 @@ int main( int argc, char *argv[] )
 
                               case DIKS_SMALL_B:
                                    if (caps & DVCAPS_BRIGHTNESS)
-                                        adj |= DCAF_BRIGHTNESS;
+                                        flags |= DCAF_BRIGHTNESS;
                                    break;
                               case DIKS_SMALL_C:
                                    if (caps & DVCAPS_CONTRAST)
-                                        adj |= DCAF_CONTRAST;
+                                        flags |= DCAF_CONTRAST;
                                    break;
                               case DIKS_SMALL_H:
                                    if (caps & DVCAPS_HUE)
-                                        adj |= DCAF_HUE;
+                                        flags |= DCAF_HUE;
                                    break;
                               case DIKS_SMALL_S:
                                    if (caps & DVCAPS_SATURATION)
-                                        adj |= DCAF_SATURATION;
+                                        flags |= DCAF_SATURATION;
                                    break;
 
                               case DIKS_CURSOR_LEFT:
-                                   if (adj)
-                                        adjust_color( adj, -257 );
+                                   if (flags)
+                                        adjust_color( flags, -257 );
                                    else if (caps & DVCAPS_SEEK)
                                         seek( -10.0 );
                                    break;
 
                               case DIKS_CURSOR_RIGHT:
-                                   if (adj)
-                                        adjust_color( adj, 257 );
+                                   if (flags)
+                                        adjust_color( flags, 257 );
                                    else if (caps & DVCAPS_SEEK)
                                         seek( 10.0 );
                                    break;
@@ -577,19 +571,19 @@ int main( int argc, char *argv[] )
                          switch (DFB_LOWER_CASE( evt.key_symbol )) {
                               case DIKS_SMALL_B:
                                    if (caps & DVCAPS_BRIGHTNESS)
-                                        adj &= ~DCAF_BRIGHTNESS;
+                                        flags &= ~DCAF_BRIGHTNESS;
                                    break;
                               case DIKS_SMALL_C:
                                    if (caps & DVCAPS_CONTRAST)
-                                        adj &= ~DCAF_CONTRAST;
+                                        flags &= ~DCAF_CONTRAST;
                                    break;
                               case DIKS_SMALL_H:
                                    if (caps & DVCAPS_HUE)
-                                        adj &= ~DCAF_HUE;
+                                        flags &= ~DCAF_HUE;
                                    break;
                               case DIKS_SMALL_S:
                                    if (caps & DVCAPS_SATURATION)
-                                        adj &= ~DCAF_SATURATION;
+                                        flags &= ~DCAF_SATURATION;
                                    break;
                               default:
                                    break;
