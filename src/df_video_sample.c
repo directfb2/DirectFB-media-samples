@@ -21,10 +21,10 @@
 */
 
 #include <direct/hash.h>
-#include <direct/mutex.h>
+#include <direct/thread.h>
 #include <direct/util.h>
 #include <directfb.h>
-#include <directfb_util.h>
+#include <directfb_strings.h>
 
 #include "dfblogo.h"
 
@@ -70,6 +70,20 @@ static DFBColor     logo_color    = { 0x22, 0x33, 0xbb, 0xff };
 static int          logo_progress = 0;
 
 /******************************************************************************/
+
+static const DirectFBPixelFormatNames(format_names)
+
+static DFBSurfacePixelFormat parse_pixelformat( const char *format )
+{
+     int i;
+
+     for (i = 0; i < D_ARRAY_SIZE(format_names); i++) {
+          if (!strcmp( format, format_names[i].name ))
+               return format_names[i].format;
+     }
+
+     return DSPF_UNKNOWN;
+}
 
 static void dump_stream_info( DFBSurfaceDescription *dsc )
 {
@@ -381,7 +395,7 @@ int main( int argc, char *argv[] )
                } else
                if (!strncmp( option, "-format=", sizeof("-format=") - 1 )) {
                     option += sizeof("-format=") - 1;
-                    pixelformat = dfb_pixelformat_parse( option );
+                    pixelformat = parse_pixelformat( option );
                } else
                if (!strncmp( option, "-size=", sizeof("-size=") - 1 )) {
                     option += sizeof("-size=") - 1;
