@@ -1,3 +1,24 @@
+commit a28b71ceca7af250416e4232f4ecf1d31a15d5fc
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Wed Mar 22 08:17:50 2023 +0100
+
+    Add sample images
+
+commit 32a04e15c602ed0ed856b011f1d1fad2c2053c9c
+Merge: eb868cc 3757fa9
+Author: DirectFB2 <80045286+directfb2@users.noreply.github.com>
+Date:   Sat Mar 18 08:39:12 2023 +0100
+
+    Merge pull request #7 from caramelli/master
+    
+    df_video_sample: Rework adjust_color()
+
+commit 3757fa970101be8fd851e82fd74bc99963b9f493
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Sat Mar 18 08:35:56 2023 +0100
+
+    Update ChangeLog
+
 commit 4f9686bcee14e56be82fd2060b7304cc278dea88
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Sat Mar 18 08:35:06 2023 +0100
