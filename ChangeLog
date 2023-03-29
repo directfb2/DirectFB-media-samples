@@ -1,3 +1,24 @@
+commit 0d49d3e68e7e1df21a1dda591dbadf8ecd2c556b
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Wed Mar 29 22:39:45 2023 +0200
+
+    fs_music_sample: Fix when switching to previous track
+
+commit aceedc35ee7a1acb01610493dd92172aa940172d
+Merge: 32a04e1 2fd7ae5
+Author: DirectFB2 <80045286+directfb2@users.noreply.github.com>
+Date:   Wed Mar 22 08:20:02 2023 +0100
+
+    Merge pull request #8 from caramelli/master
+    
+    Add sample images
+
+commit 2fd7ae5d487b58c77859370434b8f102a784161b
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Wed Mar 22 08:18:53 2023 +0100
+
+    Update ChangeLog
+
 commit a28b71ceca7af250416e4232f4ecf1d31a15d5fc
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Wed Mar 22 08:17:50 2023 +0100

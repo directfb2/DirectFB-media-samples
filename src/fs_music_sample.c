@@ -93,7 +93,7 @@ static DirectEnumerationResult track_cb( FSTrackID track_id, FSTrackDescription 
 static void print_usage()
 {
      printf( "FusionSound Music Sample Player\n\n" );
-     printf( "Usage: fs_music_sample [options] <musicfile1 musicfile2 ...>\n\n" );
+     printf( "Usage: fs_music_sample [options] <media1 media2 ...>\n\n" );
      printf( "Options:\n\n" );
      printf( "  --quiet              Do not print tracks and progress info.\n" );
      printf( "  --depth=<bitdepth>   Select the bitdepth to use (8, 16, 24 or 32).\n" );
@@ -112,7 +112,7 @@ static void print_usage()
      printf( "  *,/     to increase/decrease playback speed\n" );
      printf( "  +,-     to increase/decrease volume level\n" );
      printf( "  l       to toggle track looping\n" );
-     printf( "  r       to toggle playlist repeat\n" );
+     printf( "  r       to toggle media list repeat\n" );
 }
 
 static void fs_shutdown()
@@ -140,9 +140,10 @@ int main( int argc, char *argv[] )
 {
      int                          i;
      FSMusicProviderPlaybackFlags flags  = FMPLAY_NOFX;
-     int                          repeat = 0;
      float                        volume = 1;
      float                        pitch  = 1;
+     int                          dir    = 1;
+     int                          repeat = 0;
      int                          quit   = 0;
 
      if (argc < 2) {
@@ -228,7 +229,7 @@ int main( int argc, char *argv[] )
      do {
           Media *media, *media_next;
 
-          for (media = (Media*) medias; media && !quit;) {
+          for (media = dir > 0 ? (Media*) medias : direct_list_get_last( medias ); media && !quit;) {
                DirectResult           ret;
                FSTrackDescription     desc;
                FSStreamDescription    sdsc;
@@ -250,7 +251,7 @@ int main( int argc, char *argv[] )
                if (!quiet)
                     fprintf( stderr, "\nMedia %d (%s):\n", media->id, media->mrl );
 
-               for (track = (MediaTrack*) media->tracks; track && !quit;) {
+               for (track = dir > 0 ? (MediaTrack*) media->tracks : direct_list_get_last( media->tracks ); track && !quit;) {
                     double len       = 0;
                     int    vol_set   = 0;
                     int    pitch_set = 0;
@@ -427,11 +428,17 @@ int main( int argc, char *argv[] )
                                                   music->SeekTo( music, len * (c - '0') / 10 );
                                              break;
                                         case '<':
-                                             if (track == (MediaTrack*) media->tracks)
-                                                  media_next = (Media*) media->link.prev;
+                                             if (track == (MediaTrack*) media->tracks) {
+                                                  track_next = NULL;
+                                                  if (media == (Media*) medias)
+                                                       media_next = NULL;
+                                                  else
+                                                       media_next = (Media*) media->link.prev;
+                                             }
                                              else
-                                                  track_next = (MediaTrack*)track->link.prev;
+                                                  track_next = (MediaTrack*) track->link.prev;
                                         case '>':
+                                             dir = c != '<' ? 1 : -1;
                                              if (!pitch) {
                                                   playback->SetVolume( playback, 0 );
                                                   playback->SetPitch( playback, 1 );
