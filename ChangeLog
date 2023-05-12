@@ -1,3 +1,24 @@
+commit 6319b86a37262a339da52fc425f0fc4da48eef0f
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Fri May 12 14:26:16 2023 +0200
+
+    Add df_databuffer
+
+commit b0b6f3ac8e140f4fb789efb95f2324ddf97327b0
+Merge: aceedc3 9cc5bfa
+Author: DirectFB2 <80045286+directfb2@users.noreply.github.com>
+Date:   Wed Mar 29 22:41:49 2023 +0200
+
+    Merge pull request #9 from caramelli/master
+    
+    fs_music_sample: Fix when switching to previous track
+
+commit 9cc5bfae8572f5b7edb696179b2509fd2ff965b4
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Wed Mar 29 22:39:58 2023 +0200
+
+    Update ChangeLog
+
 commit 0d49d3e68e7e1df21a1dda591dbadf8ecd2c556b
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Wed Mar 29 22:39:45 2023 +0200
