@@ -1,6 +1,6 @@
 /* DirectFB surface dump created by directfb-csource */
 
-static const unsigned char dfblogo_data[] =
+static const unsigned char tinylogo_data[] =
   "\0\0\0\1\0\0\0\1\0\0\0\1\0\0\0\1\342\342\342%\364\364\364\262\366\366"
   "\366\306\366\366\366\306\366\366\366\307\367\367\367\307\366\366\366"
   "\307\367\367\367\310\366\366\366\310\366\366\366\301\362\362\362\215"
@@ -111,12 +111,12 @@ static const unsigned char dfblogo_data[] =
   "\304\363\363\363\302\362\362\362\255\357\357\357n\330\330\330\26\0\0"
   "\0\1\0\0\0\1\0\0\0\1";
 
-static const DFBSurfaceDescription dfblogo_desc = {
+static const DFBSurfaceDescription tinylogo_desc = {
   flags                   : DSDESC_WIDTH | DSDESC_HEIGHT | DSDESC_PIXELFORMAT |
                             DSDESC_PREALLOCATED,
   width                   : 70,
   height                  : 8,
   pixelformat             : DSPF_ARGB,
-  preallocated : {{  data : (void*) dfblogo_data,
+  preallocated : {{  data : (void*) tinylogo_data,
                     pitch : 280 }}
 };

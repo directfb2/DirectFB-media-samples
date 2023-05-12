@@ -42,10 +42,10 @@ static IDirectFBSurface     *surface   = NULL;
 static int width, height;
 
 /* list of font files */
-static char **fontname_list;
-static int    fontname_count;
+static char **fontfile_list;
+static int    fontfile_count;
 
-/**************************************************************************************************/
+/**********************************************************************************************************************/
 
 static int show_ascender     = 0;
 static int show_descender    = 0;
@@ -64,7 +64,7 @@ static int glyphs_per_yline  = 16;
 
 #define GLYPHS_PER_PAGE (glyphs_per_xline * glyphs_per_yline)
 
-/**************************************************************************************************/
+/**********************************************************************************************************************/
 
 static const struct {
      char *key;
@@ -88,7 +88,7 @@ static const struct {
      { "ESC",        "Exit"}
 };
 
-static void render_help_page( const char *fontname )
+static void render_help_page( const char *fontfile )
 {
      DFBFontDescription  fontdesc;
      IDirectFBFont      *fixedfont;
@@ -98,7 +98,7 @@ static void render_help_page( const char *fontname )
      fontdesc.flags  = DFDESC_HEIGHT;
      fontdesc.height = 16;
 
-     DFBCHECK(dfb->CreateFont( dfb, fontname, &fontdesc, &fixedfont ));
+     DFBCHECK(dfb->CreateFont( dfb, fontfile, &fontdesc, &fixedfont ));
 
      surface->SetColor( surface, 0x00, 0x00, 0x00, 0xff );
      surface->SetFont( surface, fixedfont );
@@ -113,13 +113,13 @@ static void render_help_page( const char *fontname )
 
      surface->DrawString( surface, "Loaded Fonts:", -1, width / 2, 300, DSTF_CENTER );
 
-     for (i = 0; i < fontname_count; i++)
-          surface->DrawString( surface, fontname_list[i], -1, width / 2, 340 + i * 20, DSTF_CENTER );
+     for (i = 0; i < fontfile_count; i++)
+          surface->DrawString( surface, fontfile_list[i], -1, width / 2, 340 + i * 20, DSTF_CENTER );
 
      fixedfont->Release( fixedfont );
 }
 
-static void render_font_page( const char *fontname, unsigned int first_char )
+static void render_font_page( const char *fontfile, unsigned int first_char )
 {
      DFBFontDescription  fontdesc;
      IDirectFBFont      *font, *fixedfont;
@@ -140,25 +140,25 @@ static void render_font_page( const char *fontname, unsigned int first_char )
      fontdesc.flags  = DFDESC_HEIGHT;
      fontdesc.height = 16;
 
-     DFBCHECK(dfb->CreateFont( dfb, fontname, &fontdesc, &fixedfont ));
+     DFBCHECK(dfb->CreateFont( dfb, fontfile, &fontdesc, &fixedfont ));
 
      surface->SetFont( surface, fixedfont );
 
      /* load font */
-     if (!strstr( fontname, ".dgiff" )) {
+     if (!strstr( fontfile, ".dgiff" )) {
           fontdesc.flags      |= DFDESC_ATTRIBUTES;
           fontdesc.height      = 9 * bheight / glyphs_per_yline / 16;
           fontdesc.attributes  = antialias ? 0 : DFFA_MONOCHROME;
           fontdesc.attributes |= unicode_mode ? 0 : DFFA_NOCHARMAP;
      }
 
-     if (dfb->CreateFont( dfb, fontname, &fontdesc, &font ) != DFB_OK) {
+     if (dfb->CreateFont( dfb, fontfile, &fontdesc, &font ) != DFB_OK) {
           static const char *msg = "failed opening '";
-          char               text[strlen( msg ) + strlen( fontname ) + 2];
+          char               text[strlen( msg ) + strlen( fontfile ) + 2];
 
           strcpy( text, msg );
-          strcpy( text + strlen( msg ), fontname );
-          strcpy( text + strlen( msg ) + strlen( fontname ), "'" );
+          strcpy( text + strlen( msg ), fontfile );
+          strcpy( text + strlen( msg ) + strlen( fontfile ), "'" );
 
           surface->SetColor( surface, 0xff, 0x00, 0x00, 0xff );
           surface->DrawString( surface, text, -1, width / 2, 10, DSTF_TOPCENTER );
@@ -175,7 +175,7 @@ static void render_font_page( const char *fontname, unsigned int first_char )
 
      surface->SetColor( surface, 0xa0, 0xa0, 0xa0, 0xff );
 
-     surface->DrawString( surface, fontname, -1, width / 2, 10, DSTF_TOPCENTER );
+     surface->DrawString( surface, fontfile, -1, width / 2, 10, DSTF_TOPCENTER );
 
      surface->DrawString( surface, unicode_mode ? "Unicode Map" : "Raw Map", -1, 10, 10, DSTF_TOPLEFT );
 
@@ -300,6 +300,8 @@ static void render_font_page( const char *fontname, unsigned int first_char )
      font->Release( font );
 }
 
+/**********************************************************************************************************************/
+
 static void dfb_shutdown()
 {
      if (surface)   surface->Release( surface );
@@ -310,7 +312,7 @@ static void dfb_shutdown()
 static void print_usage()
 {
      printf( "DirectFB Font Sample Viewer\n\n" );
-     printf( "Usage: df_fonts_sample [options] <fontfile> ... <fontfile>\n\n" );
+     printf( "Usage: df_fonts_sample [options] files\n\n" );
      printf( "Options:\n\n" );
      printf( "  --help      Print usage information.\n" );
      printf( "  --dfb-help  Output DirectFB usage information.\n\n" );
@@ -352,8 +354,8 @@ int main( int argc, char *argv[] )
           return 0;
      }
 
-     fontname_count = argc - 1;
-     fontname_list  = argv + 1;
+     fontfile_count = argc - 1;
+     fontfile_list  = argv + 1;
 
      /* create the main interface */
      DFBCHECK(DirectFBCreate( &dfb ));
@@ -375,15 +377,15 @@ int main( int argc, char *argv[] )
      /* main loop */
      while (1) {
           DFBInputEvent  evt;
-          char          *fontname = fontname_list[current_font];
+          char          *fontfile = fontfile_list[current_font];
 
           if (update) {
                surface->Clear( surface, 0xff, 0xff, 0xff, 0xff );
 
                if (show_help)
-                    render_help_page( fontname );
+                    render_help_page( fontfile );
                else
-                    render_font_page( fontname, first_glyph );
+                    render_font_page( fontfile, first_glyph );
 
                surface->Flip( surface, NULL, DSFLIP_WAITFORSYNC );
 
@@ -428,7 +430,7 @@ int main( int argc, char *argv[] )
 
                          case DIKS_SPACE:
                          case DIKS_CURSOR_UP:
-                              if (++current_font >= fontname_count)
+                              if (++current_font >= fontfile_count)
                                    current_font = 0;
                               update = 1;
                               break;
@@ -436,7 +438,7 @@ int main( int argc, char *argv[] )
                          case DIKS_BACKSPACE:
                          case DIKS_CURSOR_DOWN:
                               if (--current_font < 0)
-                                   current_font = fontname_count-1;
+                                   current_font = fontfile_count - 1;
                               update = 1;
                               break;
 
