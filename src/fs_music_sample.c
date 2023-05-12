@@ -93,7 +93,7 @@ static DirectEnumerationResult track_cb( FSTrackID track_id, FSTrackDescription 
 static void print_usage()
 {
      printf( "FusionSound Music Sample Player\n\n" );
-     printf( "Usage: fs_music_sample [options] <media1 media2 ...>\n\n" );
+     printf( "Usage: fs_music_sample [options] files\n\n" );
      printf( "Options:\n\n" );
      printf( "  --quiet              Do not print tracks and progress info.\n" );
      printf( "  --depth=<bitdepth>   Select the bitdepth to use (8, 16, 24 or 32).\n" );

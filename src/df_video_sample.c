@@ -26,7 +26,7 @@
 #include <directfb.h>
 #include <directfb_strings.h>
 
-#include "dfblogo.h"
+#include "tinylogo.h"
 
 /* macro for a safe call to DirectFB functions */
 #define DFBCHECK(x)                                                   \
@@ -69,7 +69,7 @@ static DFBRectangle logo_rect[2];
 static DFBColor     logo_color    = { 0x22, 0x33, 0xbb, 0xff };
 static int          logo_progress = 0;
 
-/******************************************************************************/
+/**********************************************************************************************************************/
 
 static const DirectFBPixelFormatNames(format_names)
 
@@ -104,7 +104,7 @@ static void dump_stream_info( DFBSurfaceDescription *dsc )
      }
 }
 
-/******************************************************************************/
+/**********************************************************************************************************************/
 
 static void create_stack( DFBSurfaceDescription *dsc )
 {
@@ -180,7 +180,7 @@ static void destroy_stack()
      direct_hash_destroy( window_stack );
 }
 
-/******************************************************************************/
+/**********************************************************************************************************************/
 
 static void create_frame( DFBSurfaceDescription *dsc )
 {
@@ -216,10 +216,10 @@ static bool frame_blitter( DirectHash *stack, unsigned long id, void *value, voi
           /* elapsed */
           dst->SetColor( dst, logo_color.r, logo_color.g, logo_color.b, 0xff );
           dst->SetBlittingFlags( dst, DSBLIT_COLORIZE | DSBLIT_BLEND_ALPHACHANNEL );
-          dst->Blit( dst, logo, &logo_rect[0], 7, height - dfblogo_desc.height - 7 );
+          dst->Blit( dst, logo, &logo_rect[0], 7, height - tinylogo_desc.height - 7 );
           /* remaining */
           dst->SetBlittingFlags( dst, DSBLIT_BLEND_ALPHACHANNEL );
-          dst->Blit( dst, logo, &logo_rect[1], 7 + logo_rect[0].w, height - dfblogo_desc.height - 7 );
+          dst->Blit( dst, logo, &logo_rect[1], 7 + logo_rect[0].w, height - tinylogo_desc.height - 7 );
      }
 
      dst->Flip( dst, NULL, DSFLIP_NONE );
@@ -234,13 +234,13 @@ static void frame_cb( void *ctx )
      /* setup coordinates for progressive logo */
      if (logo) {
           logo_rect[0].y = logo_rect[1].y = 0;
-          logo_rect[0].h = logo_rect[1].h = dfblogo_desc.height;
+          logo_rect[0].h = logo_rect[1].h = tinylogo_desc.height;
           /* elapsed part */
           logo_rect[0].x = 0;
-          logo_rect[0].w = dfblogo_desc.width * logo_progress / 100;
+          logo_rect[0].w = tinylogo_desc.width * logo_progress / 100;
           /* remainig part */
           logo_rect[1].x = logo_rect[0].w;
-          logo_rect[1].w = dfblogo_desc.width - logo_rect[0].w;
+          logo_rect[1].w = tinylogo_desc.width - logo_rect[0].w;
      }
 
      /* recursively blit frame to windows */
@@ -256,7 +256,7 @@ static void frame_cb( void *ctx )
      }
 }
 
-/******************************************************************************/
+/**********************************************************************************************************************/
 
 static void seek( double step )
 {
@@ -318,12 +318,23 @@ static void set_volume( float step )
      video->SetVolume( video, volume + step );
 }
 
-/******************************************************************************/
+/**********************************************************************************************************************/
+
+static void dfb_shutdown()
+{
+     if (window_stack) destroy_stack();
+     if (logo)         logo->Release( logo );
+     if (frame)        frame->Release( frame );
+     if (video)        video->Release( video );
+     if (event_buffer) event_buffer->Release( event_buffer );
+     if (layer)        layer->Release( layer );
+     if (dfb)          dfb->Release( dfb );
+}
 
 static void print_usage()
 {
      printf( "DirectFB Video Sample Viewer\n\n" );
-     printf( "Usage: df_video_sample [options] video\n\n" );
+     printf( "Usage: df_video_sample [options] <videofile>\n\n" );
      printf( "Options:\n\n" );
      printf( "  --info                   Dump stream info.\n" );
      printf( "  --no-logo                Do not display DirectFB logo in the lower-left corner of the window.\n" );
@@ -347,17 +358,6 @@ static void print_usage()
      printf( "  S,s + left  to decrease saturation\n" );
      printf( "  H,h + right to increase hue\n" );
      printf( "  H,h + left  to decrease hue\n" );
-}
-
-static void dfb_shutdown()
-{
-     if (window_stack) destroy_stack();
-     if (logo)         logo->Release( logo );
-     if (frame)        frame->Release( frame );
-     if (video)        video->Release( video );
-     if (event_buffer) event_buffer->Release( event_buffer );
-     if (layer)        layer->Release( layer );
-     if (dfb)          dfb->Release( dfb );
 }
 
 int main( int argc, char *argv[] )
@@ -446,7 +446,7 @@ int main( int argc, char *argv[] )
 
      /* create logo */
      if (use_logo)
-          DFBCHECK(dfb->CreateSurface( dfb, &dfblogo_desc, &logo ));
+          DFBCHECK(dfb->CreateSurface( dfb, &tinylogo_desc, &logo ));
 
      /* create window stack */
      create_stack( &dsc );

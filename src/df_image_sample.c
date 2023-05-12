@@ -25,7 +25,7 @@
 #include <directfb.h>
 #include <directfb_strings.h>
 
-#include "dfblogo.h"
+#include "tinylogo.h"
 
 /* macro for a safe call to DirectFB functions */
 #define DFBCHECK(x)                                                   \
@@ -62,7 +62,7 @@ static int                   width       = 0;
 static int                   height      = 0;
 static int                   n_windows   = 1;
 
-/******************************************************************************/
+/**********************************************************************************************************************/
 
 static const DirectFBPixelFormatNames(format_names)
 
@@ -93,7 +93,7 @@ static void dump_image_info( DFBSurfaceDescription *dsc )
      printf( "\n" );
 }
 
-/******************************************************************************/
+/**********************************************************************************************************************/
 
 static void create_stack( DFBSurfaceDescription *dsc )
 {
@@ -169,7 +169,7 @@ static void destroy_stack()
      direct_hash_destroy( window_stack );
 }
 
-/******************************************************************************/
+/**********************************************************************************************************************/
 
 static void create_frame( DFBSurfaceDescription *dsc )
 {
@@ -211,23 +211,7 @@ static bool frame_blitter( DirectHash *stack, unsigned long id, void *value, voi
      return true;
 }
 
-/******************************************************************************/
-
-static void print_usage()
-{
-     printf( "DirectFB Image Sample Viewer\n\n" );
-     printf( "Usage: df_image_sample [options] image\n\n" );
-     printf( "Options:\n\n" );
-     printf( "  --info                   Dump image info.\n" );
-     printf( "  --no-logo                Do not display DirectFB logo in the upper-left corner of the window.\n" );
-     printf( "  --format=<pixelformat>   Select the pixelformat to use.\n" );
-     printf( "  --size=<width>x<height>  Set windows size.\n" );
-     printf( "  --windows=<N>            Display image on N windows (default:1, maximum:20).\n" );
-     printf( "  --help                   Print usage information.\n" );
-     printf( "  --dfb-help               Output DirectFB usage information.\n\n" );
-     printf( "Use:\n" );
-     printf( "  ESC,Q,q to quit\n" );
-}
+/**********************************************************************************************************************/
 
 static void dfb_shutdown()
 {
@@ -238,6 +222,22 @@ static void dfb_shutdown()
      if (event_buffer) event_buffer->Release( event_buffer );
      if (layer)        layer->Release( layer );
      if (dfb)          dfb->Release( dfb );
+}
+
+static void print_usage()
+{
+     printf( "DirectFB Image Sample Viewer\n\n" );
+     printf( "Usage: df_image_sample [options] <imagefile>\n\n" );
+     printf( "Options:\n\n" );
+     printf( "  --info                   Dump image info.\n" );
+     printf( "  --no-logo                Do not display DirectFB logo in the upper-left corner of the window.\n" );
+     printf( "  --format=<pixelformat>   Select the pixelformat to use.\n" );
+     printf( "  --size=<width>x<height>  Set windows size.\n" );
+     printf( "  --windows=<N>            Display image on N windows (default:1, maximum:20).\n" );
+     printf( "  --help                   Print usage information.\n" );
+     printf( "  --dfb-help               Output DirectFB usage information.\n\n" );
+     printf( "Use:\n" );
+     printf( "  ESC,Q,q to quit\n" );
 }
 
 int main( int argc, char *argv[] )
@@ -319,7 +319,7 @@ int main( int argc, char *argv[] )
 
      /* create logo */
      if (use_logo)
-          DFBCHECK(dfb->CreateSurface( dfb, &dfblogo_desc, &logo ));
+          DFBCHECK(dfb->CreateSurface( dfb, &tinylogo_desc, &logo ));
 
      /* create window stack */
      create_stack( &dsc );
