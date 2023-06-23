@@ -226,6 +226,9 @@ int main( int argc, char *argv[] )
      /* create the main interface */
      FSCHECK(FusionSoundCreate( &sound ));
 
+     /* register termination function */
+     atexit( fs_shutdown );
+
      do {
           Media *media, *media_next;
 
@@ -517,8 +520,6 @@ int main( int argc, char *argv[] )
                media = media_next;
           }
      } while (repeat && !quit);
-
-     fs_shutdown();
 
      return 0;
 }

@@ -58,7 +58,7 @@ static DIRenderCallbackResult render_callback( DFBRectangle *rect, void *ctx )
 
      surface->GetSize( surface, &width, &height );
 
-     primary->Blit( primary, surface, rect, (screen_width - width) / 2, (screen_height - height) / 2 );
+     primary->Blit( primary, surface, rect, (screen_width - width) / 2, (screen_height - height) / 2 + rect->y );
 
      return DIRCR_OK;
 }
@@ -390,6 +390,9 @@ int main( int argc, char *argv[] )
      /* create the main interface */
      DFBCHECK(DirectFBCreate( &dfb ));
 
+     /* register termination function */
+     atexit( dfb_shutdown );
+
      /* set the cooperative level to DFSCL_FULLSCREEN for exclusive access to the primary layer */
      dfb->SetCooperativeLevel( dfb, DFSCL_FULLSCREEN );
 
@@ -416,8 +419,6 @@ int main( int argc, char *argv[] )
 
      test_streamed();
      sleep( 2 );
-
-     dfb_shutdown();
 
      return 0;
 }
