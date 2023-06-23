@@ -1,3 +1,24 @@
+commit 9467038897a21452623876173b0eae0cb93a1da2
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Fri Jun 23 11:12:22 2023 +0200
+
+    Register termination function with atexit()
+
+commit 8b7830b6a696ea1061e087f87c6e8bf7eae260bf
+Merge: b0b6f3a 56fcb5d
+Author: DirectFB2 <80045286+directfb2@users.noreply.github.com>
+Date:   Fri May 12 14:33:15 2023 +0200
+
+    Merge pull request #10 from caramelli/master
+    
+    Add df_databuffer
+
+commit 56fcb5ddc1223c460640183bdfa8f92f5caf3fb1
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Fri May 12 14:26:27 2023 +0200
+
+    Update ChangeLog
+
 commit 6319b86a37262a339da52fc425f0fc4da48eef0f
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Fri May 12 14:26:16 2023 +0200
