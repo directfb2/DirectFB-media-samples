@@ -134,6 +134,7 @@ static void create_stack( DFBSurfaceDescription *dsc )
 
           window->GetID( window, &id );
           window->SetOpacity( window, 0xff );
+          window->RequestFocus( window );
 
           surface->Clear( surface, 0x00, 0x00, 0x00, 0xff );
           surface->Flip( surface, NULL, DSFLIP_NONE );
@@ -422,6 +423,9 @@ int main( int argc, char *argv[] )
      /* create the main interface */
      DFBCHECK(DirectFBCreate( &dfb ));
 
+     /* register termination function */
+     atexit( dfb_shutdown );
+
      /* get the primary display layer */
      DFBCHECK(dfb->GetDisplayLayer( dfb, DLID_PRIMARY, &layer ));
 
@@ -499,7 +503,6 @@ int main( int argc, char *argv[] )
                               case DIKS_BACK:
                               case DIKS_STOP:
                               case DIKS_EXIT:
-                                   dfb_shutdown();
                                    return 42;
 
                               case DIKS_SPACE:
@@ -626,7 +629,6 @@ int main( int argc, char *argv[] )
                          if (window) {
                               if (--n_windows <= 0) {
                                    direct_mutex_unlock( &window_mutex );
-                                   dfb_shutdown();
                                    return 42;
                               }
                          }

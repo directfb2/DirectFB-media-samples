@@ -34,16 +34,19 @@
      } while (0)
 
 /* DirectFB interfaces */
-static IDirectFB            *dfb       = NULL;
-static IDirectFBEventBuffer *keybuffer = NULL;
-static IDirectFBSurface     *surface   = NULL;
-
-/* screen width and height */
-static int width, height;
+static IDirectFB             *dfb         = NULL;
+static IDirectFBDisplayLayer *layer       = NULL;
+static IDirectFBWindow       *window       = NULL;
+static IDirectFBSurface      *surface      = NULL;
+static IDirectFBEventBuffer  *event_buffer = NULL;
 
 /* list of font files */
 static char **fontfile_list;
 static int    fontfile_count;
+
+/* command line options */
+static int width  = 0;
+static int height = 0;
 
 /**********************************************************************************************************************/
 
@@ -90,15 +93,15 @@ static const struct {
 
 static void render_help_page( const char *fontfile )
 {
-     DFBFontDescription  fontdesc;
+     DFBFontDescription  fdsc;
      IDirectFBFont      *fixedfont;
      int                 i;
 
      /* load fixedfont */
-     fontdesc.flags  = DFDESC_HEIGHT;
-     fontdesc.height = 16;
+     fdsc.flags  = DFDESC_HEIGHT;
+     fdsc.height = 16;
 
-     DFBCHECK(dfb->CreateFont( dfb, fontfile, &fontdesc, &fixedfont ));
+     DFBCHECK(dfb->CreateFont( dfb, fontfile, &fdsc, &fixedfont ));
 
      surface->SetColor( surface, 0x00, 0x00, 0x00, 0xff );
      surface->SetFont( surface, fixedfont );
@@ -121,7 +124,7 @@ static void render_help_page( const char *fontfile )
 
 static void render_font_page( const char *fontfile, unsigned int first_char )
 {
-     DFBFontDescription  fontdesc;
+     DFBFontDescription  fdsc;
      IDirectFBFont      *font, *fixedfont;
      int                 bwidth, bheight;
      int                 xborder, yborder;
@@ -137,22 +140,22 @@ static void render_font_page( const char *fontfile, unsigned int first_char )
      yborder = (height - bheight) / 2;
 
      /* load fixedfont */
-     fontdesc.flags  = DFDESC_HEIGHT;
-     fontdesc.height = 16;
+     fdsc.flags  = DFDESC_HEIGHT;
+     fdsc.height = 16;
 
-     DFBCHECK(dfb->CreateFont( dfb, fontfile, &fontdesc, &fixedfont ));
+     DFBCHECK(dfb->CreateFont( dfb, fontfile, &fdsc, &fixedfont ));
 
      surface->SetFont( surface, fixedfont );
 
      /* load font */
      if (!strstr( fontfile, ".dgiff" )) {
-          fontdesc.flags      |= DFDESC_ATTRIBUTES;
-          fontdesc.height      = 9 * bheight / glyphs_per_yline / 16;
-          fontdesc.attributes  = antialias ? 0 : DFFA_MONOCHROME;
-          fontdesc.attributes |= unicode_mode ? 0 : DFFA_NOCHARMAP;
+          fdsc.flags      |= DFDESC_ATTRIBUTES;
+          fdsc.height      = 9 * bheight / glyphs_per_yline / 16;
+          fdsc.attributes  = antialias ? 0 : DFFA_MONOCHROME;
+          fdsc.attributes |= unicode_mode ? 0 : DFFA_NOCHARMAP;
      }
 
-     if (dfb->CreateFont( dfb, fontfile, &fontdesc, &font ) != DFB_OK) {
+     if (dfb->CreateFont( dfb, fontfile, &fdsc, &font ) != DFB_OK) {
           static const char *msg = "failed opening '";
           char               text[strlen( msg ) + strlen( fontfile ) + 2];
 
@@ -179,7 +182,7 @@ static void render_font_page( const char *fontfile, unsigned int first_char )
 
      surface->DrawString( surface, unicode_mode ? "Unicode Map" : "Raw Map", -1, 10, 10, DSTF_TOPLEFT );
 
-     snprintf( label, sizeof(label), "%d pixels", fontdesc.height );
+     snprintf( label, sizeof(label), "%d pixels", fdsc.height );
 
      surface->DrawString( surface, label, -1, width - 10, 10, DSTF_TOPRIGHT );
 
@@ -304,18 +307,21 @@ static void render_font_page( const char *fontfile, unsigned int first_char )
 
 static void dfb_shutdown()
 {
-     if (surface)   surface->Release( surface );
-     if (keybuffer) keybuffer->Release( keybuffer );
-     if (dfb)       dfb->Release( dfb );
+     if (event_buffer) event_buffer->Release( event_buffer );
+     if (surface)      surface->Release( surface );
+     if (window)       window->Release( window );
+     if (layer)        layer->Release( layer );
+     if (dfb)          dfb->Release( dfb );
 }
 
 static void print_usage()
 {
      printf( "DirectFB Font Sample Viewer\n\n" );
-     printf( "Usage: df_fonts_sample [options] files\n\n" );
+     printf( "Usage: df_font_sample [options] files\n\n" );
      printf( "Options:\n\n" );
-     printf( "  --help      Print usage information.\n" );
-     printf( "  --dfb-help  Output DirectFB usage information.\n\n" );
+     printf( "  --size=<width>x<height>  Set windows size.\n" );
+     printf( "  --help                   Print usage information.\n" );
+     printf( "  --dfb-help               Output DirectFB usage information.\n\n" );
      printf( "Use:\n" );
      printf( "  ESC,Q,q           to quit\n" );
      printf( "  F1,H,h            to show help\n" );
@@ -335,49 +341,78 @@ static void print_usage()
 
 int main( int argc, char *argv[] )
 {
-     DFBSurfaceDescription surfacedesc;
+     DFBDisplayLayerConfig config;
+     DFBWindowDescription  wdsc;
+     int                   i;
      int                   update       = 1;
      int                   first_glyph  = 0;
      int                   current_font = 0;
-
-     if (argc < 2) {
-          print_usage();
-          return 0;
-     }
 
      /* initialize DirectFB including command line parsing */
      DFBCHECK(DirectFBInit( &argc, &argv ));
 
      /* parse command line */
-     if (!strcmp( argv[1], "--help" )) {
-          print_usage();
-          return 0;
+     for (i = 1; i < argc; i++) {
+          char *option = argv[i];
+
+          if (*option == '-') {
+               option++;
+
+               if (!strcmp( option, "-help" )) {
+                    print_usage();
+                    return 0;
+               } else
+               if (!strncmp( option, "-size=", sizeof("-size=") - 1 )) {
+                    option += sizeof("-size=") - 1;
+                    sscanf( option, "%dx%d", &width, &height );
+               }
+          }
+          else {
+               fontfile_count = argc - i;
+               fontfile_list  = argv + i;
+               break;
+          }
      }
 
-     fontfile_count = argc - 1;
-     fontfile_list  = argv + 1;
+     if (!fontfile_count) {
+          print_usage();
+          return 1;
+     }
 
      /* create the main interface */
      DFBCHECK(DirectFBCreate( &dfb ));
 
-     /* set the cooperative level to DFSCL_FULLSCREEN for exclusive access to the primary layer */
-     dfb->SetCooperativeLevel( dfb, DFSCL_FULLSCREEN );
+     /* register termination function */
+     atexit( dfb_shutdown );
 
-     /* create an event buffer for key events */
-     DFBCHECK(dfb->CreateInputEventBuffer( dfb, DICAPS_KEYS, DFB_FALSE, &keybuffer ));
+     /* get the primary display layer */
+     DFBCHECK(dfb->GetDisplayLayer( dfb, DLID_PRIMARY, &layer ));
 
-     /* get the primary surface, i.e. the surface of the primary layer */
-     surfacedesc.flags = DSDESC_CAPS;
-     surfacedesc.caps  = DSCAPS_PRIMARY | DSCAPS_DOUBLE;
+     DFBCHECK(layer->GetConfiguration( layer, &config ));
 
-     DFBCHECK(dfb->CreateSurface( dfb, &surfacedesc, &surface ));
+     width  = width  ?: config.width;
+     height = height ?: config.height;
 
-     DFBCHECK(surface->GetSize( surface, &width, &height ));
+     /* create the window */
+     wdsc.flags  = DWDESC_POSX | DWDESC_POSY | DWDESC_WIDTH | DWDESC_HEIGHT;
+     wdsc.posx   = 0;
+     wdsc.posy   = 0;
+     wdsc.width  = width;
+     wdsc.height = height;
+
+     DFBCHECK(layer->CreateWindow( layer, &wdsc, &window ));
+     DFBCHECK(window->GetSurface( window, &surface ));
+
+     /* create an event buffer */
+     DFBCHECK(window->CreateEventBuffer( window, &event_buffer ));
+
+     window->SetOpacity( window, 0xff );
+     window->RequestFocus( window );
 
      /* main loop */
      while (1) {
-          DFBInputEvent  evt;
-          char          *fontfile = fontfile_list[current_font];
+          DFBWindowEvent  evt;
+          char           *fontfile = fontfile_list[current_font];
 
           if (update) {
                surface->Clear( surface, 0xff, 0xff, 0xff, 0xff );
@@ -392,24 +427,23 @@ int main( int argc, char *argv[] )
                update = 0;
           }
 
-          keybuffer->WaitForEvent( keybuffer );
+          event_buffer->WaitForEvent( event_buffer );
 
           /* process event buffer */
-          while (keybuffer->GetEvent( keybuffer, DFB_EVENT(&evt) ) == DFB_OK) {
-               if (evt.type == DIET_KEYRELEASE) {
+          while (event_buffer->GetEvent( event_buffer, DFB_EVENT(&evt) ) == DFB_OK) {
+               if (evt.type == DWET_KEYUP) {
                     if (show_help) {
                          show_help = 0;
                          update = 1;
                     }
                }
-               else if (evt.type == DIET_KEYPRESS) {
+               else if (evt.type == DWET_KEYDOWN) {
                     switch (DFB_LOWER_CASE( evt.key_symbol )) {
                          case DIKS_ESCAPE:
                          case DIKS_SMALL_Q:
                          case DIKS_BACK:
                          case DIKS_STOP:
                          case DIKS_EXIT:
-                              dfb_shutdown();
                               return 42;
 
                          case DIKS_PAGE_DOWN:
