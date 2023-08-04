@@ -21,10 +21,8 @@
 */
 
 #include <direct/hash.h>
-#include <direct/thread.h>
 #include <direct/util.h>
 #include <directfb.h>
-#include <directfb_strings.h>
 
 #include "tinylogo.h"
 
@@ -39,136 +37,166 @@
      } while (0)
 
 /* DirectFB interfaces */
-static IDirectFB              *dfb          = NULL;
-static IDirectFBDisplayLayer  *layer        = NULL;
-static IDirectFBEventBuffer   *event_buffer = NULL;
-static IDirectFBVideoProvider *video        = NULL;
-static IDirectFBSurface       *frame        = NULL;
-static IDirectFBSurface       *logo         = NULL;
+static IDirectFB             *dfb          = NULL;
+static IDirectFBDisplayLayer *layer        = NULL;
+static IDirectFBEventBuffer  *event_buffer = NULL;
+static IDirectFBSurface      *logo         = NULL;
 
 /* window struct */
 struct stack_entry {
-     IDirectFBWindow  *window;
-     IDirectFBSurface *surface;
+     IDirectFBWindow        *window;
+     IDirectFBSurface       *surface;
+     IDirectFBVideoProvider *video_provider;
+     int                     progress;
 };
 
 /* window hash table */
-static DirectHash  *window_stack = NULL;
-static DirectMutex  window_mutex = DIRECT_MUTEX_INITIALIZER();
+static DirectHash *window_stack = NULL;
+
+/* list of video files */
+static char **mrl_list;
+static int    mrl_count;
 
 /* command line options */
-static int                   info        = 0;
-static int                   use_logo    = 1;
-static DFBSurfacePixelFormat pixelformat = DSPF_UNKNOWN;
-static int                   width       = 0;
-static int                   height      = 0;
-static int                   n_windows   = 1;
+static int info       = 0;
+static int use_logo   = 1;
+static int win_width  = 0;
+static int win_height = 0;
 
-/* progressive logo */
-static DFBRectangle logo_rect[2];
-static DFBColor     logo_color    = { 0x22, 0x33, 0xbb, 0xff };
-static int          logo_progress = 0;
+/* logo color */
+static DFBColor logo_color = { 0x22, 0x33, 0xbb, 0xff };
 
 /**********************************************************************************************************************/
 
-static const DirectFBPixelFormatNames(format_names)
-
-static DFBSurfacePixelFormat parse_pixelformat( const char *format )
+static bool logo_progress( DirectHash *stack, unsigned long id, void *value, void *ctx )
 {
-     int i;
+     struct stack_entry     *entry          = value;
+     IDirectFBVideoProvider *video_provider = entry->video_provider;
 
-     for (i = 0; i < D_ARRAY_SIZE(format_names); i++) {
-          if (!strcmp( format, format_names[i].name ))
-               return format_names[i].format;
-     }
+     double len = 0.0;
+     double pos = 0.0;
 
-     return DSPF_UNKNOWN;
+     video_provider->GetLength( video_provider, &len );
+     video_provider->GetPos( video_provider, &pos );
+
+     if (len > 0.0 && pos > 0.0)
+          entry->progress = pos * 100.0 / len + 0.5;
+     else
+          entry->progress = 0;
+
+     return true;
 }
 
-static void dump_stream_info( DFBSurfaceDescription *dsc )
+static void frame_cb( void *ctx )
 {
-     DFBStreamDescription desc;
+     struct stack_entry *entry    = ctx;
+     IDirectFBSurface   *surface  = entry->surface;
+     int                 progress = entry->progress;
 
-     video->GetStreamDescription( video, &desc );
+     /* draw progressive logo */
+     if (logo) {
+          int          width, height;
+          DFBRectangle rect[2];
 
-     printf( "  # Video: %s, %dx%d (ratio %.3f), %.2f fps, %d Kbits/s\n",
-             *desc.video.encoding ? desc.video.encoding : "Unknown",
-             dsc->width, dsc->height, desc.video.aspect,
-             desc.video.framerate, desc.video.bitrate / 1000 );
+          surface->GetSize( surface, &width, &height );
 
-     if (desc.caps & DVSCAPS_AUDIO) {
-          printf( "  # Audio: %s, %d Khz, %d channel(s), %d Kbits/s\n",
-                  *desc.audio.encoding ? desc.audio.encoding : "Unknown",
-                  desc.audio.samplerate / 1000, desc.audio.channels,
-                  desc.audio.bitrate / 1000 );
+          /* setup coordinates */
+          if (logo) {
+               rect[0].y = rect[1].y = 0;
+               rect[0].h = rect[1].h = tinylogo_desc.height;
+               /* elapsed part */
+               rect[0].x = 0;
+               rect[0].w = tinylogo_desc.width * progress / 100;
+               /* remainig part */
+               rect[1].x = rect[0].w;
+               rect[1].w = tinylogo_desc.width - rect[0].w;
+          }
+
+          /* elapsed */
+          surface->SetColor( surface, logo_color.r, logo_color.g, logo_color.b, 0xff );
+          surface->SetBlittingFlags( surface, DSBLIT_COLORIZE | DSBLIT_BLEND_ALPHACHANNEL );
+          surface->Blit( surface, logo, &rect[0], 7, height - tinylogo_desc.height - 7 );
+          /* remaining */
+          surface->SetBlittingFlags( surface, DSBLIT_BLEND_ALPHACHANNEL );
+          surface->Blit( surface, logo, &rect[1], 7 + rect[0].w, height - tinylogo_desc.height - 7 );
+     }
+
+     surface->Flip( surface, NULL, DSFLIP_NONE );
+
+     /* rotate colors */
+     if (logo) {
+          logo_color.r -= 2;
+          logo_color.g += 1;
+          logo_color.b -= 2;
      }
 }
 
 /**********************************************************************************************************************/
 
-static void create_stack( DFBSurfaceDescription *dsc )
+static void add_window( IDirectFBVideoProvider *video_provider, DFBSurfaceDescription *sdsc )
 {
-     DFBWindowDescription wdsc;
-     int                  i;
-
-     /* create hash table */
-     direct_hash_create( n_windows, &window_stack );
+     DFBWindowID           id;
+     DFBWindowDescription  wdsc;
+     struct stack_entry   *entry;
+     IDirectFBWindow      *window;
+     IDirectFBSurface     *surface;
 
      wdsc.flags  = DWDESC_POSX | DWDESC_POSY | DWDESC_WIDTH | DWDESC_HEIGHT;
-     wdsc.posx   = 0;
-     wdsc.posy   = 0;
-     wdsc.width  = width  = width  ?: dsc->width;
-     wdsc.height = height = height ?: dsc->height;
+     wdsc.posx   = 32 * direct_hash_count( window_stack );
+     wdsc.posy   = 18 * direct_hash_count( window_stack );
+     wdsc.width  = win_width  ?: sdsc->width;
+     wdsc.height = win_height ?: sdsc->height;
 
-     for (i = 0; i < n_windows; i++, wdsc.posx += 10, wdsc.posy += 5) {
-          struct stack_entry *entry;
-          IDirectFBWindow    *window;
-          IDirectFBSurface   *surface;
-          DFBWindowID         id;
+     entry = D_CALLOC( 1, sizeof(struct stack_entry) );
 
-          entry = calloc( 1, sizeof(struct stack_entry) );
+     DFBCHECK(layer->CreateWindow( layer, &wdsc, &window ));
+     DFBCHECK(window->GetSurface( window, &surface ));
+     DFBCHECK(window->AttachEventBuffer( window, event_buffer ));
 
-          DFBCHECK(layer->CreateWindow( layer, &wdsc, &window ));
-          DFBCHECK(window->GetSurface( window, &surface ));
-          DFBCHECK(window->AttachEventBuffer( window, event_buffer ));
+     surface->Clear( surface, 0x00, 0x00, 0x00, 0xff );
+     surface->Flip( surface, NULL, DSFLIP_NONE );
 
-          window->GetID( window, &id );
-          window->SetOpacity( window, 0xff );
-          window->RequestFocus( window );
+     window->GetID( window, &id );
+     window->SetOpacity( window, 0xff );
+     window->RequestFocus( window );
 
-          surface->Clear( surface, 0x00, 0x00, 0x00, 0xff );
-          surface->Flip( surface, NULL, DSFLIP_NONE );
+     entry->window         = window;
+     entry->surface        = surface;
+     entry->video_provider = video_provider;
 
-          entry->window  = window;
-          entry->surface = surface;
-          direct_hash_insert( window_stack, id, entry );
-     }
+     direct_hash_insert( window_stack, id, entry );
+
+     /* enable gapless looping playback */
+     video_provider->SetPlaybackFlags( video_provider, DVPLAY_LOOPING );
+
+     /* start video playback */
+     video_provider->PlayTo( video_provider, surface, NULL, frame_cb, entry );
 }
 
-static IDirectFBWindow *remove_window( DFBWindowID id )
+static bool remove_window( DFBWindowID id )
 {
-     struct stack_entry *entry;
-     IDirectFBWindow    *window = NULL;
+     struct stack_entry *entry = direct_hash_lookup( window_stack, id );
 
-     entry = direct_hash_lookup( window_stack, id );
      if (entry) {
-          window = entry->window;
+          entry->video_provider->Release( entry->video_provider );
           entry->surface->Release( entry->surface );
-          window->Release( window );
-          free( entry );
+          entry->window->Release( entry->window );
+          D_FREE( entry );
           direct_hash_remove( window_stack, id );
+          return true;
      }
-
-     return window;
+     else
+          return false;
 }
 
 static bool stack_destructor( DirectHash *stack, unsigned long id, void *value, void *ctx )
 {
      struct stack_entry *entry = value;
 
+     entry->video_provider->Release( entry->video_provider );
      entry->surface->Release( entry->surface );
      entry->window->Release( entry->window );
-     free( entry );
+     D_FREE( entry );
 
      return true;
 }
@@ -183,114 +211,19 @@ static void destroy_stack()
 
 /**********************************************************************************************************************/
 
-static void create_frame( DFBSurfaceDescription *dsc )
+static void adjust_color( DFBWindowID id, DFBColorAdjustmentFlags flags, int step )
 {
-     DFBSurfaceDescription sdsc;
+     DFBColorAdjustment      adj;
+     struct stack_entry     *entry;
+     IDirectFBVideoProvider *video_provider;
 
-     sdsc.flags  = DSDESC_WIDTH | DSDESC_HEIGHT;
-     sdsc.width  = dsc->width;
-     sdsc.height = dsc->height;
+     entry = direct_hash_lookup( window_stack, id );
+     if (!entry)
+          return;
 
-     if (pixelformat) {
-          sdsc.flags       |= DSDESC_PIXELFORMAT;
-          sdsc.pixelformat  = pixelformat;
-     }
+     video_provider = entry->video_provider;
 
-     DFBCHECK(dfb->CreateSurface( dfb, &sdsc, &frame ));
-}
-
-static bool frame_blitter( DirectHash *stack, unsigned long id, void *value, void *ctx )
-{
-     struct stack_entry    *entry = value;
-     IDirectFBSurface      *dst   = entry->surface;
-     DFBSurfaceDescription *dsc   = ctx;
-
-     dst->SetBlittingFlags( dst, DSBLIT_NOFX );
-
-     if (width != dsc->width || height != dsc->height)
-          dst->StretchBlit( dst, frame, NULL, NULL );
-     else
-          dst->Blit( dst, frame, NULL, 0, 0 );
-
-     /* draw progressive logo */
-     if (logo) {
-          /* elapsed */
-          dst->SetColor( dst, logo_color.r, logo_color.g, logo_color.b, 0xff );
-          dst->SetBlittingFlags( dst, DSBLIT_COLORIZE | DSBLIT_BLEND_ALPHACHANNEL );
-          dst->Blit( dst, logo, &logo_rect[0], 7, height - tinylogo_desc.height - 7 );
-          /* remaining */
-          dst->SetBlittingFlags( dst, DSBLIT_BLEND_ALPHACHANNEL );
-          dst->Blit( dst, logo, &logo_rect[1], 7 + logo_rect[0].w, height - tinylogo_desc.height - 7 );
-     }
-
-     dst->Flip( dst, NULL, DSFLIP_NONE );
-
-     return true;
-}
-
-static void frame_cb( void *ctx )
-{
-     DFBSurfaceDescription *dsc = ctx;
-
-     /* setup coordinates for progressive logo */
-     if (logo) {
-          logo_rect[0].y = logo_rect[1].y = 0;
-          logo_rect[0].h = logo_rect[1].h = tinylogo_desc.height;
-          /* elapsed part */
-          logo_rect[0].x = 0;
-          logo_rect[0].w = tinylogo_desc.width * logo_progress / 100;
-          /* remainig part */
-          logo_rect[1].x = logo_rect[0].w;
-          logo_rect[1].w = tinylogo_desc.width - logo_rect[0].w;
-     }
-
-     /* recursively blit frame to windows */
-     direct_mutex_lock( &window_mutex );
-     direct_hash_iterate( window_stack, frame_blitter, dsc );
-     direct_mutex_unlock( &window_mutex );
-
-     /* rotate colors */
-     if (logo) {
-          logo_color.r -= 2;
-          logo_color.g += 1;
-          logo_color.b -= 2;
-     }
-}
-
-/**********************************************************************************************************************/
-
-static void seek( double step )
-{
-     double pos = 0.0;
-
-     video->GetPos( video, &pos );
-
-     pos += step;
-     if (pos < 0)
-          pos = 0;
-
-     video->SeekTo( video, pos );
-}
-
-static void set_speed( double step )
-{
-     double speed = 1.0;
-
-     video->GetSpeed( video, &speed );
-
-     if (speed == 0.0 && step > 1.0)
-          speed = 0.1;
-
-     speed *= step;
-
-     video->SetSpeed( video, speed );
-}
-
-static void adjust_color( DFBColorAdjustmentFlags flags, int step )
-{
-     DFBColorAdjustment adj;
-
-     if (video->GetColorAdjustment( video, &adj ) != DFB_OK)
+     if (video_provider->GetColorAdjustment( video_provider, &adj ) != DFB_OK)
           return;
 
      adj.flags = flags;
@@ -307,16 +240,127 @@ static void adjust_color( DFBColorAdjustmentFlags flags, int step )
      if (flags & DCAF_SATURATION)
           adj.saturation = CLAMP( adj.saturation + step, 0, 0xffff );
 
-     video->SetColorAdjustment( video, &adj );
+     video_provider->SetColorAdjustment( video_provider, &adj );
 }
 
-static void set_volume( float step )
+static void pause_resume( DFBWindowID id )
 {
-     float volume = 0.0f;
+     double                  speed;
+     struct stack_entry     *entry;
+     IDirectFBVideoProvider *video_provider;
 
-     video->GetVolume( video, &volume );
+     entry = direct_hash_lookup( window_stack, id );
+     if (!entry)
+          return;
 
-     video->SetVolume( video, volume + step );
+     video_provider = entry->video_provider;
+
+     if (video_provider->GetSpeed( video_provider, &speed ) != DFB_OK)
+          return;
+
+     speed = (speed != 0.0) ? 0.0 : 1.0;
+
+     video_provider->SetSpeed( video_provider, speed );
+}
+
+static void stop_start( DFBWindowID id )
+{
+     DFBVideoProviderStatus  status;
+     struct stack_entry     *entry;
+     IDirectFBSurface       *surface;
+     IDirectFBVideoProvider *video_provider;
+
+     entry = direct_hash_lookup( window_stack, id );
+     if (!entry)
+          return;
+
+     surface        = entry->surface;
+     video_provider = entry->video_provider;
+
+     if (video_provider->GetStatus( video_provider, &status ) != DFB_OK)
+          return;
+
+     if (status != DVSTATE_PLAY)
+          video_provider->PlayTo( video_provider, surface, NULL, frame_cb, entry );
+     else
+          video_provider->Stop( video_provider );
+}
+
+static void seek( DFBWindowID id, double step )
+{
+     double                  pos;
+     struct stack_entry     *entry;
+     IDirectFBVideoProvider *video_provider;
+
+     entry = direct_hash_lookup( window_stack, id );
+     if (!entry)
+          return;
+
+     video_provider = entry->video_provider;
+
+     if (video_provider->GetPos( video_provider, &pos ) != DFB_OK)
+          return;
+
+     pos += step;
+     if (pos < 0)
+          pos = 0;
+
+     video_provider->SeekTo( video_provider, pos );
+}
+
+static void send_input_event( DFBWindowID id, DFBWindowEvent *evt )
+{
+     struct stack_entry     *entry;
+     IDirectFBVideoProvider *video_provider;
+
+     entry = direct_hash_lookup( window_stack, id );
+     if (!entry)
+          return;
+
+     video_provider = entry->video_provider;
+
+     video_provider->SendEvent( video_provider, DFB_EVENT(evt) );
+}
+
+static void set_speed( DFBWindowID id, double step )
+{
+     double                  speed;
+     struct stack_entry     *entry;
+     IDirectFBVideoProvider *video_provider;
+
+     entry = direct_hash_lookup( window_stack, id );
+     if (!entry)
+          return;
+
+     video_provider = entry->video_provider;
+
+     if (video_provider->GetSpeed( video_provider, &speed ) != DFB_OK)
+          return;
+
+     if (speed == 0.0 && step > 1.0)
+          speed = 0.1;
+
+     speed *= step;
+
+     video_provider->SetSpeed( video_provider, speed );
+}
+
+static void set_volume( DFBWindowID id, float step )
+{
+     float                   volume;
+     struct stack_entry     *entry;
+     IDirectFBVideoProvider *video_provider;
+
+     entry = direct_hash_lookup( window_stack, id );
+     if (!entry)
+          return;
+
+     video_provider = entry->video_provider;
+
+     if (video_provider->GetVolume( video_provider, &volume ) != DFB_OK)
+          return;
+
+     video_provider->SetVolume( video_provider, volume + step );
 }
 
 /**********************************************************************************************************************/
@@ -325,8 +369,6 @@ static void dfb_shutdown()
 {
      if (window_stack) destroy_stack();
      if (logo)         logo->Release( logo );
-     if (frame)        frame->Release( frame );
-     if (video)        video->Release( video );
      if (event_buffer) event_buffer->Release( event_buffer );
      if (layer)        layer->Release( layer );
      if (dfb)          dfb->Release( dfb );
@@ -335,13 +377,11 @@ static void dfb_shutdown()
 static void print_usage()
 {
      printf( "DirectFB Video Sample Viewer\n\n" );
-     printf( "Usage: df_video_sample [options] <videofile>\n\n" );
+     printf( "Usage: df_video_sample [options] files\n\n" );
      printf( "Options:\n\n" );
      printf( "  --info                   Dump stream info.\n" );
      printf( "  --no-logo                Do not display DirectFB logo in the lower-left corner of the window.\n" );
-     printf( "  --format=<pixelformat>   Select the pixelformat to use.\n" );
      printf( "  --size=<width>x<height>  Set windows size.\n" );
-     printf( "  --windows=<N>            Play video on N windows (default:1, maximum:20).\n" );
      printf( "  --help                   Print usage information.\n" );
      printf( "  --dfb-help               Output DirectFB usage information.\n\n" );
      printf( "Use:\n" );
@@ -363,11 +403,9 @@ static void print_usage()
 
 int main( int argc, char *argv[] )
 {
-     DFBVideoProviderCapabilities  caps;
-     DFBSurfaceDescription         dsc;
-     int                           i;
-     DFBColorAdjustmentFlags       flags = DCAF_NONE;
-     const char                   *mrl   = NULL;
+     int                          i;
+     DFBVideoProviderCapabilities caps;
+     DFBColorAdjustmentFlags      flags = DCAF_NONE;
 
      if (argc < 2) {
           print_usage();
@@ -394,31 +432,22 @@ int main( int argc, char *argv[] )
                if (!strcmp( option, "-no-logo" )) {
                     use_logo = 0;
                } else
-               if (!strncmp( option, "-format=", sizeof("-format=") - 1 )) {
-                    option += sizeof("-format=") - 1;
-                    pixelformat = parse_pixelformat( option );
-               } else
                if (!strncmp( option, "-size=", sizeof("-size=") - 1 )) {
                     option += sizeof("-size=") - 1;
-                    sscanf( option, "%dx%d", &width, &height );
-               } else
-               if (!strncmp( option, "-windows=", sizeof("-windows=") - 1 )) {
-                    option += sizeof("-windows=") - 1;
-                    n_windows = strtol( option, NULL, 10 );
-                    n_windows = CLAMP( n_windows, 1, 20 );
+                    sscanf( option, "%dx%d", &win_width, &win_height );
                }
           }
-          else if (i == argc - 1) {
-               mrl = option;
+          else {
+               mrl_count = argc - i;
+               mrl_list  = argv + i;
+               break;
           }
      }
 
-     if (!mrl || !*mrl) {
+     if (!mrl_count) {
           print_usage();
           return 1;
      }
-
-     i = 0;
 
      /* create the main interface */
      DFBCHECK(DirectFBCreate( &dfb ));
@@ -432,56 +461,65 @@ int main( int argc, char *argv[] )
      /* create an event buffer */
      DFBCHECK(dfb->CreateEventBuffer( dfb, &event_buffer ));
 
-     /* create a video provider */
-     DFBCHECK(dfb->CreateVideoProvider( dfb, mrl, &video ));
-
-     /* retrieve video provider capabilities */
-     video->GetCapabilities( video, &caps );
-
-     /* retrieve a surface description of the video */
-     video->GetSurfaceDescription( video, &dsc );
-
-     /* dump stream information */
-     if (info)
-          dump_stream_info( &dsc );
-
-     /* create surface for video frames */
-     create_frame( &dsc );
-
      /* create logo */
      if (use_logo)
           DFBCHECK(dfb->CreateSurface( dfb, &tinylogo_desc, &logo ));
 
      /* create window stack */
-     create_stack( &dsc );
+     direct_hash_create( mrl_count, &window_stack );
 
-     /* enable gapless looping playback */
-     video->SetPlaybackFlags( video, DVPLAY_LOOPING );
+     for (i = 0; i < mrl_count; i++) {
+          DFBSurfaceDescription   sdsc;
+          IDirectFBVideoProvider *video_provider;
 
-     /* start playback */
-     video->PlayTo( video, frame, NULL, frame_cb, &dsc );
+          /* create a video provider */
+          DFBCHECK(dfb->CreateVideoProvider( dfb, mrl_list[i], &video_provider ));
+
+          /* retrieve video provider capabilities */
+          video_provider->GetCapabilities( video_provider, &caps );
+
+          /* retrieve a surface description of the video */
+          video_provider->GetSurfaceDescription( video_provider, &sdsc );
+
+          /* dump stream information */
+          if (info) {
+               DFBStreamDescription desc;
+
+               video_provider->GetStreamDescription( video_provider, &desc );
+
+               printf( "%s\n", mrl_list[i] );
+               printf( "  # Video: %s, %dx%d (ratio %.3f), %.2f fps, %d Kbits/s\n",
+                       *desc.video.encoding ? desc.video.encoding : "Unknown",
+                       sdsc.width, sdsc.height, desc.video.aspect,
+                       desc.video.framerate, desc.video.bitrate / 1000 );
+
+               if (desc.caps & DVSCAPS_AUDIO)
+                    printf( "  # Audio: %s, %d Khz, %d channel(s), %d Kbits/s\n",
+                            *desc.audio.encoding ? desc.audio.encoding : "Unknown",
+                            desc.audio.samplerate / 1000, desc.audio.channels,
+                            desc.audio.bitrate / 1000 );
+          }
+
+          /* add window to the stack */
+          add_window( video_provider, &sdsc );
+     }
+
+     /* video provider input interactivity */
+     i = 0;
 
      /* main loop */
      while (1) {
-          DFBWindowEvent         evt;
-          DFBVideoProviderStatus status = DVSTATE_UNKNOWN;
+          DFBWindowEvent evt;
 
+          /* recursively update windows logo progress */
           if (logo) {
                if (event_buffer->WaitForEventWithTimeout( event_buffer, 0, 150 ) == DFB_TIMEOUT) {
-                    double len = 0.0;
-                    double pos = 0.0;
-
-                    video->GetLength( video, &len );
-                    video->GetPos( video, &pos );
-
-                    if (len > 0.0 && pos > 0.0)
-                         logo_progress = pos * 100.0 / len + 0.5;
-                    else
-                         logo_progress = 0;
-
+                    direct_hash_iterate( window_stack, logo_progress, NULL );
                     continue;
                }
           }
+          else
+               event_buffer->WaitForEvent( event_buffer );
 
           /* process event buffer */
           while (event_buffer->GetEvent( event_buffer, DFB_EVENT(&evt) ) == DFB_OK) {
@@ -493,7 +531,7 @@ int main( int argc, char *argv[] )
                               i = !i;
 
                          if (i) {
-                              video->SendEvent( video, DFB_EVENT(&evt) );
+                              send_input_event( evt.window_id, &evt );
                               break;
                          }
 
@@ -507,20 +545,11 @@ int main( int argc, char *argv[] )
 
                               case DIKS_SPACE:
                               case DIKS_SMALL_P:
-                                   if (caps & DVCAPS_SPEED) {
-                                        double speed;
-                                        video->GetSpeed( video, &speed );
-                                        speed = (speed != 0.0) ? 0.0 : 1.0;
-                                        video->SetSpeed( video, speed );
-                                        break;
-                                   }
+                                   pause_resume( evt.window_id );
+                                   break;
 
                               case DIKS_ENTER:
-                                   video->GetStatus( video, &status );
-                                   if (status != DVSTATE_PLAY)
-                                        video->PlayTo( video, frame, NULL, frame_cb, &dsc );
-                                   else
-                                        video->Stop( video );
+                                   stop_start( evt.window_id );
                                    break;
 
                               case DIKS_SMALL_B:
@@ -542,36 +571,32 @@ int main( int argc, char *argv[] )
 
                               case DIKS_CURSOR_LEFT:
                                    if (flags)
-                                        adjust_color( flags, -257 );
-                                   else if (caps & DVCAPS_SEEK)
-                                        seek( -10.0 );
+                                        adjust_color( evt.window_id, flags, -257 );
+                                   else
+                                        seek( evt.window_id, -10.0 );
                                    break;
 
                               case DIKS_CURSOR_RIGHT:
                                    if (flags)
-                                        adjust_color( flags, 257 );
-                                   else if (caps & DVCAPS_SEEK)
-                                        seek( 10.0 );
+                                        adjust_color( evt.window_id, flags, 257 );
+                                   else
+                                        seek( evt.window_id, 10.0 );
                                    break;
 
                               case DIKS_CURSOR_UP:
-                                   if (caps & DVCAPS_SPEED)
-                                        set_speed( 2.0 );
+                                   set_speed( evt.window_id, 2.0 );
                                    break;
 
                               case DIKS_CURSOR_DOWN:
-                                   if (caps & DVCAPS_SPEED)
-                                        set_speed( 0.5 );
+                                   set_speed( evt.window_id, 0.5 );
                                    break;
 
                               case DIKS_PLUS_SIGN:
-                                   if (caps & DVCAPS_VOLUME)
-                                        set_volume( 0.1 );
+                                   set_volume( evt.window_id, 0.1 );
                                    break;
 
                               case DIKS_MINUS_SIGN:
-                                   if (caps & DVCAPS_VOLUME)
-                                        set_volume( -0.1 );
+                                   set_volume( evt.window_id, -0.1 );
                                    break;
 
                               default:
@@ -581,7 +606,7 @@ int main( int argc, char *argv[] )
 
                     case DWET_KEYUP:
                          if (i) {
-                              video->SendEvent( video, DFB_EVENT(&evt) );
+                              send_input_event( evt.window_id, &evt );
                               break;
                          }
 
@@ -609,30 +634,21 @@ int main( int argc, char *argv[] )
 
                     case DWET_BUTTONDOWN:
                     case DWET_BUTTONUP:
-                    case DWET_ENTER:
                     case DWET_MOTION:
+                    case DWET_ENTER:
                     case DWET_LEAVE:
                          if (i) {
-                              /* scale window coordinates to video coordinates */
-                              evt.x = evt.x * dsc.width  / width;
-                              evt.y = evt.y * dsc.height / height;
-
-                              video->SendEvent( video, DFB_EVENT(&evt) );
+                              send_input_event( evt.window_id, &evt );
                               break;
                          }
                          break;
 
                     case DWET_CLOSE: {
-                         IDirectFBWindow *window;
-                         direct_mutex_lock( &window_mutex );
-                         window = remove_window( evt.window_id );
-                         if (window) {
-                              if (--n_windows <= 0) {
-                                   direct_mutex_unlock( &window_mutex );
+                         if (remove_window( evt.window_id )) {
+                              if (--mrl_count <= 0) {
                                    return 42;
                               }
                          }
-                         direct_mutex_unlock( &window_mutex );
                          break;
                     }
 

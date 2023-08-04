@@ -21,9 +21,7 @@
 */
 
 #include <direct/hash.h>
-#include <direct/util.h>
 #include <directfb.h>
-#include <directfb_strings.h>
 
 #include "tinylogo.h"
 
@@ -41,173 +39,91 @@
 static IDirectFB              *dfb          = NULL;
 static IDirectFBDisplayLayer  *layer        = NULL;
 static IDirectFBEventBuffer   *event_buffer = NULL;
-static IDirectFBImageProvider *image        = NULL;
-static IDirectFBSurface       *frame        = NULL;
 static IDirectFBSurface       *logo         = NULL;
-
-/* window struct */
-struct stack_entry {
-     IDirectFBWindow  *window;
-     IDirectFBSurface *surface;
-};
 
 /* window hash table */
 static DirectHash *window_stack = NULL;
 
+/* list of image files */
+static char **mrl_list;
+static int    mrl_count;
+
 /* command line options */
-static int                   info        = 0;
-static int                   use_logo    = 1;
-static DFBSurfacePixelFormat pixelformat = DSPF_UNKNOWN;
-static int                   width       = 0;
-static int                   height      = 0;
-static int                   n_windows   = 1;
+static int info       = 0;
+static int use_logo   = 1;
+static int win_width  = 0;
+static int win_height = 0;
+
+/* logo color */
+static DFBColor logo_color = { 0xbb, 0x33, 0x22, 0xff };
 
 /**********************************************************************************************************************/
 
-static const DirectFBPixelFormatNames(format_names)
-
-static DFBSurfacePixelFormat parse_pixelformat( const char *format )
+static void render_func( IDirectFBSurface *surface )
 {
-     int i;
-
-     for (i = 0; i < D_ARRAY_SIZE(format_names); i++) {
-          if (!strcmp( format, format_names[i].name ))
-               return format_names[i].format;
+     if (logo) {
+          surface->SetColor( surface, logo_color.r, logo_color.g, logo_color.b, 0xff );
+          surface->SetBlittingFlags( surface, DSBLIT_COLORIZE | DSBLIT_BLEND_ALPHACHANNEL );
+          surface->Blit( surface, logo, NULL, 5, 5 );
      }
 
-     return DSPF_UNKNOWN;
-}
-
-static void dump_image_info( DFBSurfaceDescription *dsc )
-{
-     DFBImageDescription desc;
-
-     image->GetImageDescription( image, &desc );
-
-     printf( "  # Image: %dx%d", dsc->width, dsc->height );
-
-     if (desc.caps & DICAPS_COLORKEY) {
-          printf( " (colorkey 0x%x 0x%x 0x%x)", desc.colorkey_r, desc.colorkey_g, desc.colorkey_b );
-     }
-
-     printf( "\n" );
+     surface->Flip( surface, NULL, DSFLIP_NONE );
 }
 
 /**********************************************************************************************************************/
 
-static void create_stack( DFBSurfaceDescription *dsc )
+static void add_window( IDirectFBImageProvider *image_provider, DFBSurfaceDescription *sdsc )
 {
-     DFBWindowDescription wdsc;
-     int                  i;
-
-     /* create hash table */
-     direct_hash_create( n_windows, &window_stack );
+     DFBWindowID           id;
+     DFBWindowDescription  wdsc;
+     IDirectFBWindow      *window;
+     IDirectFBSurface     *surface;
 
      wdsc.flags  = DWDESC_POSX | DWDESC_POSY | DWDESC_WIDTH | DWDESC_HEIGHT;
-     wdsc.posx   = 0;
-     wdsc.posy   = 0;
-     wdsc.width  = width  = width  ?: dsc->width;
-     wdsc.height = height = height ?: dsc->height;
+     wdsc.posx   = 32 * direct_hash_count( window_stack );
+     wdsc.posy   = 18 * direct_hash_count( window_stack );
+     wdsc.width  = win_width  ?: sdsc->width;
+     wdsc.height = win_height ?: sdsc->height;
 
-     for (i = 0; i < n_windows; i++, wdsc.posx += 10, wdsc.posy += 5) {
-          struct stack_entry *entry;
-          IDirectFBWindow    *window;
-          IDirectFBSurface   *surface;
-          DFBWindowID         id;
+     DFBCHECK(layer->CreateWindow( layer, &wdsc, &window ));
+     DFBCHECK(window->GetSurface( window, &surface ));
+     DFBCHECK(window->AttachEventBuffer( window, event_buffer ));
 
-          entry = calloc( 1, sizeof(struct stack_entry) );
+     surface->Clear( surface, 0x00, 0x00, 0x00, 0xff );
+     surface->Flip( surface, NULL, DSFLIP_NONE );
 
-          DFBCHECK(layer->CreateWindow( layer, &wdsc, &window ));
-          DFBCHECK(window->GetSurface( window, &surface ));
-          DFBCHECK(window->AttachEventBuffer( window, event_buffer ));
+     window->GetID( window, &id );
+     window->SetOpacity( window, 0xff );
+     window->RequestFocus( window );
 
-          window->GetID( window, &id );
-          window->SetOpacity( window, 0xff );
-          window->RequestFocus( window );
+     direct_hash_insert( window_stack, id, window );
 
-          surface->Clear( surface, 0x00, 0x00, 0x00, 0xff );
-          surface->Flip( surface, NULL, DSFLIP_NONE );
+     /* render the image */
+     image_provider->RenderTo( image_provider, surface, NULL );
 
-          entry->window  = window;
-          entry->surface = surface;
-          direct_hash_insert( window_stack, id, entry );
-     }
+     render_func( surface );
+
+     surface->Release( surface );
 }
 
-static IDirectFBWindow *remove_window( DFBWindowID id )
+static bool remove_window( DFBWindowID id )
 {
-     struct stack_entry *entry;
-     IDirectFBWindow    *window = NULL;
+     IDirectFBWindow *window = direct_hash_lookup( window_stack, id );
 
-     entry = direct_hash_lookup( window_stack, id );
-     if (entry) {
-          window = entry->window;
-          entry->surface->Release( entry->surface );
+     if (window) {
           window->Release( window );
-          free( entry );
           direct_hash_remove( window_stack, id );
+          return true;
      }
-
-     return window;
+     else
+          return false;
 }
 
 static bool stack_destructor( DirectHash *stack, unsigned long id, void *value, void *ctx )
 {
-     struct stack_entry *entry = value;
+     IDirectFBWindow *window = value;
 
-     entry->surface->Release( entry->surface );
-     entry->window->Release( entry->window );
-     free( entry );
-
-     return true;
-}
-
-static void destroy_stack()
-{
-     direct_hash_iterate( window_stack, stack_destructor, NULL );
-
-     /* destroy hash table */
-     direct_hash_destroy( window_stack );
-}
-
-/**********************************************************************************************************************/
-
-static void create_frame( DFBSurfaceDescription *dsc )
-{
-     DFBSurfaceDescription sdsc;
-
-     sdsc.flags  = DSDESC_WIDTH | DSDESC_HEIGHT;
-     sdsc.width  = dsc->width;
-     sdsc.height = dsc->height;
-
-     if (pixelformat) {
-          sdsc.flags       |= DSDESC_PIXELFORMAT;
-          sdsc.pixelformat  = pixelformat;
-     }
-
-     DFBCHECK(dfb->CreateSurface( dfb, &sdsc, &frame ));
-}
-
-static bool frame_blitter( DirectHash *stack, unsigned long id, void *value, void *ctx )
-{
-     struct stack_entry    *entry = value;
-     IDirectFBSurface      *dst   = entry->surface;
-     DFBSurfaceDescription *dsc   = ctx;
-
-     dst->SetBlittingFlags( dst, DSBLIT_NOFX );
-
-     if (width != dsc->width || height != dsc->height)
-          dst->StretchBlit( dst, frame, NULL, NULL );
-     else
-          dst->Blit( dst, frame, NULL, 0, 0 );
-
-     if (logo) {
-          dst->SetColor( dst, 0x22, 0x33, 0xbb, 0xff );
-          dst->SetBlittingFlags( dst, DSBLIT_COLORIZE | DSBLIT_BLEND_ALPHACHANNEL );
-          dst->Blit( dst, logo, NULL, 5, 5 );
-     }
-
-     dst->Flip( dst, NULL, DSFLIP_NONE );
+     window->Release( window );
 
      return true;
 }
@@ -216,10 +132,12 @@ static bool frame_blitter( DirectHash *stack, unsigned long id, void *value, voi
 
 static void dfb_shutdown()
 {
-     if (window_stack) destroy_stack();
+     if (window_stack) {
+          direct_hash_iterate( window_stack, stack_destructor, NULL );
+          direct_hash_destroy( window_stack );
+     }
+
      if (logo)         logo->Release( logo );
-     if (frame)        frame->Release( frame );
-     if (image)        image->Release( image );
      if (event_buffer) event_buffer->Release( event_buffer );
      if (layer)        layer->Release( layer );
      if (dfb)          dfb->Release( dfb );
@@ -228,13 +146,11 @@ static void dfb_shutdown()
 static void print_usage()
 {
      printf( "DirectFB Image Sample Viewer\n\n" );
-     printf( "Usage: df_image_sample [options] <imagefile>\n\n" );
+     printf( "Usage: df_image_sample [options] files\n\n" );
      printf( "Options:\n\n" );
      printf( "  --info                   Dump image info.\n" );
      printf( "  --no-logo                Do not display DirectFB logo in the upper-left corner of the window.\n" );
-     printf( "  --format=<pixelformat>   Select the pixelformat to use.\n" );
      printf( "  --size=<width>x<height>  Set windows size.\n" );
-     printf( "  --windows=<N>            Display image on N windows (default:1, maximum:20).\n" );
      printf( "  --help                   Print usage information.\n" );
      printf( "  --dfb-help               Output DirectFB usage information.\n\n" );
      printf( "Use:\n" );
@@ -243,9 +159,7 @@ static void print_usage()
 
 int main( int argc, char *argv[] )
 {
-     DFBSurfaceDescription  dsc;
-     int                    i;
-     const char            *mrl = NULL;
+     int i;
 
      if (argc < 2) {
           print_usage();
@@ -272,26 +186,19 @@ int main( int argc, char *argv[] )
                if (!strcmp( option, "-no-logo" )) {
                     use_logo = 0;
                } else
-               if (!strncmp( option, "-format=", sizeof("-format=") - 1 )) {
-                    option += sizeof("-format=") - 1;
-                    pixelformat = parse_pixelformat( option );
-               } else
                if (!strncmp( option, "-size=", sizeof("-size=") - 1 )) {
                     option += sizeof("-size=") - 1;
-                    sscanf( option, "%dx%d", &width, &height );
-               } else
-               if (!strncmp( option, "-windows=", sizeof("-windows=") - 1 )) {
-                    option += sizeof("-windows=") - 1;
-                    n_windows = strtol( option, NULL, 10 );
-                    n_windows = CLAMP( n_windows, 1, 20 );
+                    sscanf( option, "%dx%d", &win_width, &win_height );
                }
           }
-          else if (i == argc - 1) {
-               mrl = option;
+          else {
+               mrl_count = argc - i;
+               mrl_list  = argv + i;
+               break;
           }
      }
 
-     if (!mrl || !*mrl) {
+     if (!mrl_count) {
           print_usage();
           return 1;
      }
@@ -308,31 +215,41 @@ int main( int argc, char *argv[] )
      /* create an event buffer */
      DFBCHECK(dfb->CreateEventBuffer( dfb, &event_buffer ));
 
-     /* create an image provider */
-     DFBCHECK(dfb->CreateImageProvider( dfb, mrl, &image ));
-
-     /* retrieve a surface description of the image */
-     image->GetSurfaceDescription( image, &dsc );
-
-     /* dump image information */
-     if (info)
-          dump_image_info( &dsc );
-
-     /* create surface for the image */
-     create_frame( &dsc );
-
      /* create logo */
      if (use_logo)
           DFBCHECK(dfb->CreateSurface( dfb, &tinylogo_desc, &logo ));
 
      /* create window stack */
-     create_stack( &dsc );
+     direct_hash_create( mrl_count, &window_stack );
 
-     /* render the image */
-     image->RenderTo( image, frame, NULL );
+     for (i = 0; i < mrl_count; i++) {
+          DFBSurfaceDescription   sdsc;
+          IDirectFBImageProvider *image_provider;
 
-     /* recursively blit frame to windows */
-     direct_hash_iterate( window_stack, frame_blitter, &dsc );
+          /* create an image provider */
+          DFBCHECK(dfb->CreateImageProvider( dfb, mrl_list[i], &image_provider ));
+
+          /* retrieve a surface description of the image */
+          image_provider->GetSurfaceDescription( image_provider, &sdsc );
+
+          /* dump image information */
+          if (info) {
+               DFBImageDescription desc;
+
+               printf( "%s\n", mrl_list[i] );
+               printf( "  # Image: %dx%d\n", sdsc.width, sdsc.height );
+
+               image_provider->GetImageDescription( image_provider, &desc );
+
+               if (desc.caps & DICAPS_COLORKEY)
+                    printf( "  # Color key: 0x%x 0x%x 0x%x\n", desc.colorkey_r, desc.colorkey_g, desc.colorkey_b );
+          }
+
+          /* add window to the stack */
+          add_window( image_provider, &sdsc );
+
+          image_provider->Release( image_provider );
+     }
 
      /* main loop */
      while (1) {
@@ -358,12 +275,9 @@ int main( int argc, char *argv[] )
                          break;
 
                     case DWET_CLOSE: {
-                         IDirectFBWindow *window;
-                         window = remove_window( evt.window_id );
-                         if (window) {
-                              if (--n_windows <= 0) {
+                         if (remove_window( evt.window_id )) {
+                              if (--mrl_count <= 0)
                                    return 42;
-                              }
                          }
                          break;
                     }
