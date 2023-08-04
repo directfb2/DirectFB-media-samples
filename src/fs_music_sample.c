@@ -39,7 +39,6 @@ static struct termios term;
 
 /* FusionSound interfaces */
 static IFusionSound              *sound    = NULL;
-static IFusionSoundMusicProvider *music    = NULL;
 static IFusionSoundStream        *stream   = NULL;
 static IFusionSoundPlayback      *playback = NULL;
 
@@ -233,23 +232,24 @@ int main( int argc, char *argv[] )
           Media *media, *media_next;
 
           for (media = dir > 0 ? (Media*) medias : direct_list_get_last( medias ); media && !quit;) {
-               DirectResult           ret;
-               FSTrackDescription     desc;
-               FSStreamDescription    sdsc;
-               MediaTrack            *track, *track_next;
-               FSMusicProviderStatus  status = FMSTATE_UNKNOWN;
+               DirectResult               ret;
+               FSTrackDescription         desc;
+               FSStreamDescription        sdsc;
+               IFusionSoundMusicProvider *music_provider;
+               MediaTrack                *track, *track_next;
+               FSMusicProviderStatus      status = FMSTATE_UNKNOWN;
 
                media_next = (Media*) media->link.next;
 
                /* create a music provider */
-               ret = sound->CreateMusicProvider( sound, media->mrl, &music );
+               ret = sound->CreateMusicProvider( sound, media->mrl, &music_provider );
                if (ret) {
                     media = media_next;
                     continue;
                }
 
                /* play tracks */
-               FSCHECK(music->EnumTracks( music, track_cb, media ));
+               FSCHECK(music_provider->EnumTracks( music_provider, track_cb, media ));
 
                if (!quiet)
                     fprintf( stderr, "\nMedia %d (%s):\n", media->id, media->mrl );
@@ -262,14 +262,14 @@ int main( int argc, char *argv[] )
                     track_next = (MediaTrack*) track->link.next;
 
                     /* select current track in playlist */
-                    ret = music->SelectTrack( music, track->id );
+                    ret = music_provider->SelectTrack( music_provider, track->id );
                     if (ret) {
                          track = track_next;
                          continue;
                     }
 
                     /* get stream description */
-                    music->GetStreamDescription( music, &sdsc );
+                    music_provider->GetStreamDescription( music_provider, &sdsc );
                     if (sampleformat)
                          sdsc.sampleformat = sampleformat;
 
@@ -303,7 +303,7 @@ int main( int argc, char *argv[] )
                     }
 
                     /* get track description */
-                    music->GetTrackDescription( music, &desc );
+                    music_provider->GetTrackDescription( music_provider, &desc );
 
                     /* reset volume level */
                     if (gain) {
@@ -323,7 +323,7 @@ int main( int argc, char *argv[] )
                     playback->SetPitch( playback, pitch );
 
                     /* play the selected track */
-                    ret = music->PlayToStream( music, stream );
+                    ret = music_provider->PlayToStream( music_provider, stream );
                     if (ret) {
                          FusionSoundError( "PlayToStream failed", ret );
                          break;
@@ -348,13 +348,13 @@ int main( int argc, char *argv[] )
                     }
 
                     /* get track length */
-                    music->GetLength( music, &len );
+                    music_provider->GetLength( music_provider, &len );
 
                     do {
                          double pos = 0;
 
                          /* get playback status */
-                         music->GetStatus( music, &status );
+                         music_provider->GetStatus( music_provider, &status );
 
                          if (!quiet) {
                               int filled = 0;
@@ -365,7 +365,7 @@ int main( int argc, char *argv[] )
                               stream->GetStatus( stream, &filled, &total, NULL, NULL, NULL );
 
                               /* query elapsed seconds */
-                              music->GetPos( music, &pos );
+                              music_provider->GetPos( music_provider, &pos );
 
                               /* print progress information */
                               fprintf( stderr, "\rTime: %02d:%02d:%02d of %02d:%02d:%02d  Ring Buffer:%3d%% ",
@@ -405,30 +405,30 @@ int main( int argc, char *argv[] )
                               while ((c = getc( stdin )) > 0) {
                                    switch (c) {
                                         case 'p':
-                                             music->PlayToStream( music, stream );
+                                             music_provider->PlayToStream( music_provider, stream );
                                              break;
                                         case 's':
                                              if (!pitch) {
                                                   playback->SetVolume( playback, 0 );
                                                   playback->SetPitch( playback, 1 );
                                              }
-                                             music->Stop( music );
+                                             music_provider->Stop( music_provider );
                                              if (!pitch) {
                                                   playback->SetPitch( playback, 0 );
                                                   playback->SetVolume( playback, volume );
                                              }
                                              break;
                                         case 'f':
-                                             music->GetPos( music, &pos );
-                                             music->SeekTo( music, pos + 15 );
+                                             music_provider->GetPos( music_provider, &pos );
+                                             music_provider->SeekTo( music_provider, pos + 15 );
                                              break;
                                         case 'b':
-                                             music->GetPos( music, &pos );
-                                             music->SeekTo( music, pos - 15 );
+                                             music_provider->GetPos( music_provider, &pos );
+                                             music_provider->SeekTo( music_provider, pos - 15 );
                                              break;
                                         case '0' ... '9':
                                              if (len)
-                                                  music->SeekTo( music, len * (c - '0') / 10 );
+                                                  music_provider->SeekTo( music_provider, len * (c - '0') / 10 );
                                              break;
                                         case '<':
                                              if (track == (MediaTrack*) media->tracks) {
@@ -446,12 +446,12 @@ int main( int argc, char *argv[] )
                                                   playback->SetVolume( playback, 0 );
                                                   playback->SetPitch( playback, 1 );
                                              }
-                                             music->Stop( music );
+                                             music_provider->Stop( music_provider );
                                              status = FMSTATE_FINISHED;
                                              break;
                                         case 'l':
                                              flags ^= FMPLAY_LOOPING;
-                                             music->SetPlaybackFlags( music, flags );
+                                             music_provider->SetPlaybackFlags( music_provider, flags );
                                              break;
                                         case 'r':
                                              repeat = !repeat;
@@ -507,8 +507,7 @@ int main( int argc, char *argv[] )
                }
 
                /* release the music provider */
-               music->Release( music );
-               music = NULL;
+               music_provider->Release( music_provider );
 
                /* release media tracks */
                direct_list_foreach_safe (track, track_next, media->tracks) {

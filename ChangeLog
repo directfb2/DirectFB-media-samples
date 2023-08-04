@@ -1,3 +1,24 @@
+commit ccfc105709ad7c04bf16f07e81b6df566d2854d2
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Fri Aug 4 17:28:51 2023 +0200
+
+    df_image_sample / df_video_sample: Add support for multiple input files
+
+commit 9985f148542441212dd2178131a82629984fabf4
+Merge: 8b7830b 3ca9ff9
+Author: DirectFB2 <80045286+directfb2@users.noreply.github.com>
+Date:   Fri Jun 23 11:18:12 2023 +0200
+
+    Merge pull request #11 from caramelli/master
+    
+    Register termination function with atexit()
+
+commit 3ca9ff945bfed3c2d255e137cc66ad86cd70c1ba
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Fri Jun 23 11:13:16 2023 +0200
+
+    Update ChangeLog
+
 commit 9467038897a21452623876173b0eae0cb93a1da2
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Fri Jun 23 11:12:22 2023 +0200
