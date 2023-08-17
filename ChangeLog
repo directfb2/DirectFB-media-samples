@@ -1,3 +1,24 @@
+commit 0fe981de5a0f0b0d9dcf6c2eca3a8b1ddf2e991e
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Thu Aug 17 11:36:51 2023 +0200
+
+    df_databuffer: Add option to select an image provider or a video provider (automatic if not specified)
+
+commit 4334173bb70b9a3082d3dcf5d83b76f5bab7b41f
+Merge: 9985f14 882e2a4
+Author: DirectFB2 <80045286+directfb2@users.noreply.github.com>
+Date:   Fri Aug 4 17:40:09 2023 +0200
+
+    Merge pull request #12 from caramelli/master
+    
+    df_image_sample / df_video_sample: Add support for multiple input files
+
+commit 882e2a48121848dfa3c91adb275c4c200af2650a
+Author: Nicolas Caramelli <caramelli.devel@gmail.com>
+Date:   Fri Aug 4 17:35:16 2023 +0200
+
+    Update ChangeLog
+
 commit ccfc105709ad7c04bf16f07e81b6df566d2854d2
 Author: Nicolas Caramelli <caramelli.devel@gmail.com>
 Date:   Fri Aug 4 17:28:51 2023 +0200
