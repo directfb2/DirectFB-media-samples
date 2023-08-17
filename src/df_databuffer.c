@@ -35,8 +35,12 @@
      } while (0)
 
 /* DirectFB interfaces */
-static IDirectFB        *dfb     = NULL;
-static IDirectFBSurface *primary = NULL;
+static IDirectFB              *dfb            = NULL;
+static IDirectFBSurface       *primary        = NULL;
+static IDirectFBSurface       *surface        = NULL;
+static IDirectFBFont          *font           = NULL;
+static IDirectFBImageProvider *image_provider = NULL;
+static IDirectFBVideoProvider *video_provider = NULL;
 
 /* screen width and height */
 static int screen_width, screen_height;
@@ -45,16 +49,18 @@ static int screen_width, screen_height;
 static DFBFontDescription fdsc;
 
 /* filenames in command line */
-static const char *fontfile;
-static const char *mediafile;
+static const char *fontfile  = NULL;
+static const char *mediafile = NULL;
+
+/* command line options */
+static int use_image = 0;
+static int use_video = 0;
 
 /**********************************************************************************************************************/
 
 static DIRenderCallbackResult render_callback( DFBRectangle *rect, void *ctx )
 {
-     int               width;
-     int               height;
-     IDirectFBSurface *surface = ctx;
+     int width, height;
 
      surface->GetSize( surface, &width, &height );
 
@@ -65,9 +71,7 @@ static DIRenderCallbackResult render_callback( DFBRectangle *rect, void *ctx )
 
 static void frame_callback( void *ctx )
 {
-     int               width;
-     int               height;
-     IDirectFBSurface *surface = ctx;
+     int width, height;
 
      surface->GetSize( surface, &width, &height );
 
@@ -76,14 +80,10 @@ static void frame_callback( void *ctx )
 
 static void test_file()
 {
-     DFBResult                 ret;
+     DFBResult                 ret = DFB_FAILURE;
      DFBDataBufferDescription  ddsc;
      DFBSurfaceDescription     sdsc;
      IDirectFBDataBuffer      *buffer;
-     IDirectFBSurface         *surface;
-     IDirectFBFont            *font;
-     IDirectFBImageProvider   *image_provider = NULL;
-     IDirectFBVideoProvider   *video_provider = NULL;
 
      primary->Clear( primary, 0, 0, 0, 0 );
 
@@ -100,31 +100,33 @@ static void test_file()
      /* load media */
      ddsc.file = mediafile;
      DFBCHECK(dfb->CreateDataBuffer( dfb, &ddsc, &buffer ));
-     ret = buffer->CreateImageProvider( buffer, &image_provider );
+     if (!use_video) {
+          ret = buffer->CreateImageProvider( buffer, &image_provider );
+     }
      if (ret == DFB_OK) {
           DFBCHECK(image_provider->GetSurfaceDescription( image_provider, &sdsc ));
      }
-     else {
+     else if (!use_image) {
           ret = buffer->CreateVideoProvider( buffer, &video_provider );
           if (ret == DFB_OK) {
                DFBCHECK(video_provider->GetSurfaceDescription( video_provider, &sdsc ));
                DFBCHECK(primary->GetPixelFormat( primary, &sdsc.pixelformat ));
                DFBCHECK(primary->GetColorSpace( primary, &sdsc.colorspace ));
           }
-          else {
-               DirectFBErrorFatal( "Couldn't load media from file data buffer!", ret );
-          }
      }
+
+     if (ret)
+          DirectFBErrorFatal( "Couldn't load media from file data buffer!", ret );
 
      DFBCHECK(dfb->CreateSurface( dfb, &sdsc, &surface ));
 
      if (image_provider) {
-          image_provider->SetRenderCallback( image_provider, render_callback, surface );
+          image_provider->SetRenderCallback( image_provider, render_callback, NULL );
 
           DFBCHECK(image_provider->RenderTo( image_provider, surface, NULL ));
      }
      else { /* video_provider */
-          DFBCHECK(video_provider->PlayTo( video_provider, surface, NULL, frame_callback, surface ));
+          DFBCHECK(video_provider->PlayTo( video_provider, surface, NULL, frame_callback, NULL ));
 
           sleep( 3 );
 
@@ -132,19 +134,25 @@ static void test_file()
      }
 
      surface->Release( surface );
+     surface = NULL;
 
-     if (image_provider)
+     if (image_provider) {
           image_provider->Release( image_provider );
+          image_provider = NULL;
+     }
 
-     if (video_provider)
+     if (video_provider) {
           video_provider->Release( video_provider );
+          video_provider = NULL;
+     }
 
      font->Release( font );
+     font = NULL;
 }
 
 static void test_memory()
 {
-     DFBResult                 ret;
+     DFBResult                 ret = DFB_FAILURE;
      DirectFile                fd;
      DirectFileInfo            info;
      DFBDataBufferDescription  ddsc;
@@ -154,10 +162,6 @@ static void test_memory()
      void                     *fontdata;
      void                     *mediadata;
      IDirectFBDataBuffer      *buffer;
-     IDirectFBSurface         *surface;
-     IDirectFBFont            *font;
-     IDirectFBImageProvider   *image_provider = NULL;
-     IDirectFBVideoProvider   *video_provider = NULL;
 
      primary->Clear( primary, 0, 0, 0, 0 );
 
@@ -190,31 +194,33 @@ static void test_memory()
      ddsc.memory.data   = mediadata;
      ddsc.memory.length = medialength;
      DFBCHECK(dfb->CreateDataBuffer( dfb, &ddsc, &buffer ));
-     ret = buffer->CreateImageProvider( buffer, &image_provider );
+     if (!use_video) {
+          ret = buffer->CreateImageProvider( buffer, &image_provider );
+     }
      if (ret == DFB_OK) {
           DFBCHECK(image_provider->GetSurfaceDescription( image_provider, &sdsc ));
      }
-     else {
+     else if (!use_image) {
           ret = buffer->CreateVideoProvider( buffer, &video_provider );
           if (ret == DFB_OK) {
                DFBCHECK(video_provider->GetSurfaceDescription( video_provider, &sdsc ));
                DFBCHECK(primary->GetPixelFormat( primary, &sdsc.pixelformat ));
                DFBCHECK(primary->GetColorSpace( primary, &sdsc.colorspace ));
           }
-          else {
-               DirectFBErrorFatal( "Couldn't load media from memory data buffer!", ret );
-          }
      }
+
+     if (ret)
+          DirectFBErrorFatal( "Couldn't load media from memory data buffer!", ret );
 
      DFBCHECK(dfb->CreateSurface( dfb, &sdsc, &surface ));
 
      if (image_provider) {
-          image_provider->SetRenderCallback( image_provider, render_callback, surface );
+          image_provider->SetRenderCallback( image_provider, render_callback, NULL );
 
           DFBCHECK(image_provider->RenderTo( image_provider, surface, NULL ));
      }
      else { /* video_provider */
-          DFBCHECK(video_provider->PlayTo( video_provider, surface, NULL, frame_callback, surface ));
+          DFBCHECK(video_provider->PlayTo( video_provider, surface, NULL, frame_callback, NULL ));
 
           sleep( 3 );
 
@@ -222,14 +228,20 @@ static void test_memory()
      }
 
      surface->Release( surface );
+     surface = NULL;
 
-     if (image_provider)
+     if (image_provider) {
           image_provider->Release( image_provider );
+          image_provider = NULL;
+     }
 
-     if (video_provider)
+     if (video_provider) {
           video_provider->Release( video_provider );
+          video_provider = NULL;
+     }
 
      font->Release( font );
+     font = NULL;
 
      direct_file_unmap( fontdata, fontlength );
      direct_file_unmap( mediadata, medialength );
@@ -283,14 +295,10 @@ static void *streamer( DirectThread *thread, void *arg )
 
 static void test_streamed()
 {
-     DFBResult               ret;
+     DFBResult               ret = DFB_FAILURE;
      DFBSurfaceDescription   sdsc;
      DirectThread           *streaming_thread;
      IDirectFBDataBuffer    *buffer;
-     IDirectFBSurface       *surface;
-     IDirectFBFont          *font;
-     IDirectFBImageProvider *image_provider = NULL;
-     IDirectFBVideoProvider *video_provider = NULL;
 
      primary->Clear( primary, 0, 0, 0, 0 );
 
@@ -306,31 +314,33 @@ static void test_streamed()
      /* load media */
      DFBCHECK(dfb->CreateDataBuffer( dfb, NULL, &buffer ));
      streaming_thread = direct_thread_create( DTT_DEFAULT, streamer, buffer, "Media Streamer" );
-     ret = buffer->CreateImageProvider( buffer, &image_provider );
+     if (!use_video) {
+          ret = buffer->CreateImageProvider( buffer, &image_provider );
+     }
      if (ret == DFB_OK) {
           DFBCHECK(image_provider->GetSurfaceDescription( image_provider, &sdsc ));
      }
-     else {
+     else if (!use_image) {
           ret = buffer->CreateVideoProvider( buffer, &video_provider );
           if (ret == DFB_OK) {
                DFBCHECK(video_provider->GetSurfaceDescription( video_provider, &sdsc ));
                DFBCHECK(primary->GetPixelFormat( primary, &sdsc.pixelformat ));
                DFBCHECK(primary->GetColorSpace( primary, &sdsc.colorspace ));
           }
-          else {
-               DirectFBErrorFatal( "Couldn't load media from streamed data buffer!", ret );
-          }
      }
+
+     if (ret)
+          DirectFBErrorFatal( "Couldn't load media from streamed data buffer!", ret );
 
      DFBCHECK(dfb->CreateSurface( dfb, &sdsc, &surface ));
 
      if (image_provider) {
-          image_provider->SetRenderCallback( image_provider, render_callback, surface );
+          image_provider->SetRenderCallback( image_provider, render_callback, NULL );
 
           DFBCHECK(image_provider->RenderTo( image_provider, surface, NULL ));
      }
      else { /* video_provider */
-          DFBCHECK(video_provider->PlayTo( video_provider, surface, NULL, frame_callback, surface ));
+          DFBCHECK(video_provider->PlayTo( video_provider, surface, NULL, frame_callback, NULL ));
 
           sleep( 3 );
 
@@ -342,50 +352,86 @@ static void test_streamed()
      direct_thread_destroy( streaming_thread );
 
      surface->Release( surface );
+     surface = NULL;
 
-     if (image_provider)
+     if (image_provider) {
           image_provider->Release( image_provider );
+          image_provider = NULL;
+     }
 
-     if (video_provider)
+     if (video_provider) {
           video_provider->Release( video_provider );
+          video_provider = NULL;
+     }
 
      font->Release( font );
+     font = NULL;
 }
 
 /**********************************************************************************************************************/
 
 static void dfb_shutdown()
 {
-     if (primary) primary->Release( primary );
-     if (dfb)     dfb->Release( dfb );
+     if (video_provider) video_provider->Release( video_provider );
+     if (image_provider) image_provider->Release( image_provider );
+     if (font)           font->Release( font );
+     if (surface)        surface->Release( surface );
+     if (primary)        primary->Release( primary );
+     if (dfb)            dfb->Release( dfb );
 }
 
 static void print_usage()
 {
      printf( "DirectFB DataBuffer Test\n\n" );
-     printf( "Usage: df_databuffer <fontfile> <imagefile>|<videofile>\n\n" );
+     printf( "Usage: df_databuffer [options] <fontfile> <imagefile>|<videofile>\n\n" );
+     printf( "  --image     Use image provider.\n" );
+     printf( "  --video     Use video provider.\n" );
+     printf( "  --help      Print usage information.\n" );
+     printf( "  --dfb-help  Output DirectFB usage information.\n\n" );
 }
 
 int main( int argc, char *argv[] )
 {
+     int                   i;
      DFBSurfaceDescription desc;
-
-     if (argc != 3) {
-          print_usage();
-          return 0;
-     }
 
      /* initialize DirectFB including command line parsing */
      DFBCHECK(DirectFBInit( &argc, &argv ));
 
      /* parse command line */
-     if (!strcmp( argv[1], "--help" )) {
-          print_usage();
-          return 0;
+     for (i = 1; i < argc; i++) {
+          char *option = argv[i];
+
+          if (*option == '-') {
+               option++;
+
+               if (!strcmp( option, "-help" )) {
+                    print_usage();
+                    return 0;
+               } else
+               if (!strcmp( option, "-image" )) {
+                    use_image = 1;
+               } else
+               if (!strcmp( option, "-video" )) {
+                    use_video = 1;
+               }
+          }
+          else if (i == argc - 2){
+               fontfile  = argv[i];
+               mediafile = argv[i+1];
+               break;
+          }
      }
 
-     fontfile  = argv[1];
-     mediafile = argv[2];
+     if (use_image && use_video) {
+          printf( "Select either an image provider or a video provider (automatic if not specified)\n" );
+          return 1;
+     }
+
+     if (!fontfile || !mediafile) {
+          print_usage();
+          return 1;
+     }
 
      /* create the main interface */
      DFBCHECK(DirectFBCreate( &dfb ));
